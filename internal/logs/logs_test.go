@@ -172,3 +172,18 @@ func TestRunNothingReadable(t *testing.T) {
 		t.Errorf("notes = %q", notes)
 	}
 }
+
+// Pods the kubelet rejected after a node restart stay in phase Failed next to their replacement; their logs are
+// left out while a live pod exists, and kept when they are all there is.
+func TestSelectSkipsStoppedPods(t *testing.T) {
+	live := pod("m-predictor-new", "predictor", true)
+	old := pod("m-predictor-old", "predictor", true)
+	old.Status.Phase = corev1.PodFailed
+	opts := Options{Component: "predictor"}
+	if got := Select([]corev1.Pod{old, live}, opts); len(got) != 1 || got[0].Pod != live.Name {
+		t.Errorf("want only the live pod, got %+v", got)
+	}
+	if got := Select([]corev1.Pod{old}, opts); len(got) != 1 {
+		t.Error("with only the stopped pod left, its logs must be selected")
+	}
+}

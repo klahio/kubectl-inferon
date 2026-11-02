@@ -26,7 +26,7 @@ func newLogsCommand(root *rootOptions) *cobra.Command {
 	o := &logsOptions{rootOptions: root}
 	c := &cobra.Command{
 		Use:   "logs (isvc|llmisvc)/NAME",
-		Short: "Show logs of an InferenceService's containers without looking up pod or container names",
+		Short: "Show the logs of an inference service's containers without looking up pod or container names",
 		Example: fmt.Sprintf(`  %[1]s%[2]s logs isvc/sklearn-iris            # model server of every predictor pod
   %[1]s%[2]s logs isvc/sklearn-iris --init     # model download (storage-initializer)
   %[1]s%[2]s logs isvc/sklearn-iris -c all -f  # follow every component

@@ -1,4 +1,4 @@
-# kubectl-inferon — minimum viable product (version 0.1)
+# kubectl-inferon — specification (version 0.1, with the version 0.2 additions in section 11)
 
 Status: **draft for review** · Last updated: 2026-10-29 · Supports KServe v0.16 – v0.21 (lab cluster runs v0.21.0) · Resources: InferenceService and LLMInferenceService
 
@@ -113,6 +113,7 @@ Version 0.1 only needs read access, plus `pods/portforward` for `test`.
 - For LLMInferenceServices also: `llminferenceservices` and `leaderworkersets` (multi-node only), and API discovery of the `serving.kserve.io` group
 - Missing permission for an optional object (for example `gateways`) downgrades that part of the output to "unknown (no permission)" instead of failing the command.
 - `get` and `create` on `pods/portforward` (`get` for the WebSocket transport, `create` for the older SPDY one)
+- From version 0.2, optional: cluster-wide `list` on `nodes` and `pods` for the GPU section (section 11.3); for `list -A`, `list` on the service types and `pods` in every namespace
 
 The plugin never creates, changes or deletes cluster objects.
 
@@ -455,6 +456,8 @@ Decided 2026-10-29:
 6. **LLMInferenceService in version 0.1**: `status`, `test` and `logs` support `llmisvc/NAME` (section 6a). This brings the OpenAI-compatible request mode into 0.1, for LLMInferenceServices and for InferenceServices on the Hugging Face runtime. Router-based setups (Gateway API Inference Extension) are diagnosed from `RouterReady` and their HTTPRoutes and Gateways, but not tested until a router is installed on the lab cluster.
 7. **No `create` command**: creating or editing resources stays with YAML and `kubectl apply`. The plugin stays read-only.
 8. **Release**: done. The early `v0.1.0` tag (before decision 6) was deleted, and `v0.1.0` was released from `3170603` on 2026-10-30 with section 6a. Fixes from the review before the krew-index submission go into `v0.1.1`.
+9. **No new serving platforms for now** (decided 2026-11-02): NVIDIA NIM Operator's NIMService, NVIDIA Dynamo and KServe's Knative mode were discussed and deferred. Version 0.2 goes deeper on the two supported types instead (section 11).
+10. **Wording**: user-facing text presents the plugin as a diagnosis tool for machine learning inference services. Platform names appear where they are facts the user needs: the supported types, the Compatibility table, and one line of the krew description, so that `kubectl krew search kserve` still finds it.
 
 ### Still open
 
@@ -465,9 +468,9 @@ Decided 2026-10-29:
 | Item | Why it waits | Earliest |
 |---|---|---|
 | Knative (Serverless) mode | Different objects (Knative Services and Revisions) and different status fields; the biggest scope risk | 0.2 |
-| `kubectl inferon list` | `kubectl get isvc` is good enough for 0.1 | 0.2 |
+| `kubectl inferon list` | `kubectl get isvc` is good enough for 0.1 | Done in 0.2 (section 11) |
 | ServingRuntime listing | Runtime information already appears in `status` | 0.2 |
-| Streaming responses (`"stream": true`) | Server-sent events need a different output path | 0.2 |
+| Streaming responses (`"stream": true`) | Server-sent events need a different output path | Done in 0.2 (section 11) |
 | Disaggregated prefill and decode, and multi-node workloads, on the lab cluster | One GPU, one node; covered by fixtures only | When hardware allows |
 | InferenceGraph (`ig/NAME`) | Its API is still `v1alpha1`, and it is rarely used | Later. First as a "used by graph X" line in `status`, then `kubectl inferon status ig/NAME` |
 | TrainedModel (`tm/NAME`, multi-model serving) | Rarely used | Later |
@@ -487,3 +490,50 @@ Decided 2026-10-29:
   - A `.krew.yaml` template feeds the pull request to `krew-index`.
   - `krew-release-bot` handles later version bumps.
 - **krew acceptance basics**: real value beyond plain kubectl, no overlap with an existing plugin, the `kubectl-` binary name, a valid plugin manifest, and per-platform archives.
+
+## 11. Version 0.2 additions
+
+`list`, the Startup and GPU sections and the stopped-pod rule apply to both `isvc/NAME` and `llmisvc/NAME`. `--stream` applies to OpenAI requests, and the new crash causes to vLLM servers; section 11.5 says which causes were reproduced. Everything else was checked on the lab cluster (section 7).
+
+### 11.1 `kubectl inferon list`
+
+- Lists every InferenceService and LLMInferenceService in the namespace, or in all namespaces with `-A`. The `NAME` column is `TYPE/NAME`, the argument of the other commands.
+- Columns: `NAME`, `READY` (the Ready condition), `MODEL` (model format, or the LLM model name), `PROBLEM`, `AGE`.
+- `PROBLEM` is the first finding of the pod rules of section 4.2, plus "no serving runtime", "preset cannot be applied" and an unsupported deployment mode. Pods are listed once per type for the whole scope, not once per service. Routes, Gateways and logs stay with `status`.
+- A type whose CustomResourceDefinition is missing is skipped; when neither is installed the command fails with exit code 3. A type or the pods that cannot be read are reported on standard error as "not checked".
+- `-o name` prints one `TYPE/NAME` per line; `-o json|yaml` prints the rows.
+
+### 11.2 `status`: Startup section
+
+- Splits the start of the newest live server pod (the stable predictor, or the primary LLM workload) into phases: scheduling, pod start (pulling and starting the download container), model download, server start (pulling and starting the server), model load (until the server container is ready).
+- Taken from pod conditions and container states only, so it needs no extra permission. Timestamps have one-second resolution.
+- When the pod's sandbox was recreated more than a minute after scheduling and a container has restarted (a node restart, seen on the lab cluster), the phases start at the sandbox creation, and the output notes it. A late sandbox without restarts is a slow first start and keeps the creation time.
+- A download that runs again after a failed attempt shows as "attempt N", in progress. Kubernetes records when all containers became ready, not each one: when the server is ready but another container (a service mesh proxy, say) is not, the model load has no time.
+- A failed download or a crashing server ends the list with the failure and its restart count; no total is shown then. After restarts, only the current instance's model load is shown, because the gap before it includes crash back-off.
+
+### 11.3 `status`: GPU section
+
+- Shown when the pods request a GPU resource: `nvidia.com/gpu`, MIG slices (`nvidia.com/mig-*`) and other resources whose name contains `gpu`. The request per pod is computed as the scheduler does: sidecars (init containers with `restartPolicy: Always`) add to the containers and to the init containers that start after them, and a regular init container runs alone. Pods of one component that ask for different amounts (during a rollout) are shown as separate rows.
+- For each node that offers the resource: allocatable, requested by all running and pending pods in every namespace, free, the part used by this service, and the `nvidia.com/gpu.product` label when GPU Feature Discovery sets it.
+- When a pod cannot be scheduled with "Insufficient <gpu resource>", the finding adds the free amount per node and a hint with that pod's component request and the largest free amount.
+- Needs cluster-wide `list` on `nodes` and `pods`. Without `nodes` the section shows the requests only; without `pods` it shows what the nodes offer, says the usage was not checked, and claims nothing about free GPUs.
+
+### 11.4 `test --stream`
+
+- For OpenAI requests only. `--stream`, or `"stream": true` in the input, sends a streaming request with `stream_options.include_usage`, reads the server-sent events, and reassembles the response.
+- Adds the time to the first token and the tokens per second after it: completion tokens other than the first, divided by the time from the first token to the end of the stream. Without usage in the stream, tokens are counted as chunks with text, and the output notes it.
+- Reading stops at `data: [DONE]`. Events may spread their data over several lines. Only the first choice is shown, as for complete responses.
+- An error event in the stream (servers send it with status 200 when generation fails), an unreadable event, or a stream that ends without a finish reason or `[DONE]` makes the request fail with exit code 1, and the output shows why.
+- `-o raw` prints the events as sent; `-o json` adds `streamed`, `firstTokenMs`, `tokensPerSecond` and `streamError`. An error response to a streaming request is plain JSON and is shown as usual.
+
+### 11.5 More vLLM crash causes
+
+Added to section 6a.2: a KV cache too small for `--max-model-len`, GPU memory already taken by other processes (time-sliced GPUs), a tensor or pipeline parallel size larger than the pod's GPUs (reproduced on the lab cluster, fixture `llm-tensor-parallel`), a `/dev/shm` that is too small, an unsupported model architecture, and a model that needs `--trust-remote-code`. The cases that were not reproduced match the messages in the vLLM, PyTorch and transformers sources.
+
+### 11.6 Stopped pods
+
+Pods in phase Failed or Succeeded are ignored by the diagnosis and by `logs` while other pods of the service are live. Seen on the lab cluster: after a node restart the kubelet rejected the old pods (`UnexpectedAdmissionError`), the ReplicaSet replaced them, and their last exit was reported as a crash of a Ready service. The rule applies per component: when only stopped pods are left for a component, they are still used, even if another component has live pods.
+
+### 11.7 Log lines
+
+The cause search of section 6a.2 reads whole log lines; only the lines shown are cut to 200 bytes, at a character boundary. Long vLLM errors put the cause past 200 bytes.

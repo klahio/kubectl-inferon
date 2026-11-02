@@ -13,6 +13,14 @@ Model
 Workloads
   primary   deployment/smollm-kserve   replicas 1/1
 
+Startup   pod/smollm-kserve-66c88967bb-wcbwt
+  scheduling       0s
+  pod start        1s      image pull and container start
+  model download   78s
+  server start     1s      image pull and container start
+  model load       5m      until ready
+  total            6m20s
+
 Conditions
   Ready               True
   MainWorkloadReady   True

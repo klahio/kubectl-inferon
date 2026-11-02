@@ -13,6 +13,10 @@ Model
 Components
   predictor   Not Ready   replicas 0/1   autoscaling 1–1 (cpu 80%)
 
+Startup   pod/bad-storage-predictor-f4cfc7765-wxst8
+  scheduling       0s
+  model download   13s   failed with exit code 1, restarts: 5
+
 Conditions
   Ready            False   Predictor ingress not created
   IngressReady     False   Predictor ingress not created

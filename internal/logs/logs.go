@@ -117,7 +117,26 @@ func (s Stream) Label() string {
 // Select returns the streams for the given pods, in a stable order: component, then pod, then container order in the spec.
 func Select(pods []corev1.Pod, o Options) []Stream {
 	l := o.layout()
-	sorted := append([]corev1.Pod(nil), pods...)
+	var mine []corev1.Pod
+	for _, p := range pods {
+		if o.Component == ComponentAll || l.ComponentOf(p.Labels) == o.Component {
+			mine = append(mine, p)
+		}
+	}
+	// Per component, so a running transformer does not hide the stopped pods of a predictor with nothing else left.
+	var sorted []corev1.Pod
+	byComponent := map[string][]corev1.Pod{}
+	var order []string
+	for _, p := range mine {
+		c := l.ComponentOf(p.Labels)
+		if _, ok := byComponent[c]; !ok {
+			order = append(order, c)
+		}
+		byComponent[c] = append(byComponent[c], p)
+	}
+	for _, c := range order {
+		sorted = append(sorted, livePods(byComponent[c])...)
+	}
 	sort.SliceStable(sorted, func(i, j int) bool {
 		ci, cj := l.rank(l.ComponentOf(sorted[i].Labels)), l.rank(l.ComponentOf(sorted[j].Labels))
 		if ci != cj {
@@ -137,6 +156,22 @@ func Select(pods []corev1.Pod, o Options) []Stream {
 		}
 	}
 	return out
+}
+
+// livePods drops pods that stopped for good (phase Failed or Succeeded) while others still run: their ReplicaSet has
+// replaced them, so mixing in their logs only confuses. When only stopped pods are left, their logs are all there is.
+// The status package applies the same rule to its diagnosis.
+func livePods(all []corev1.Pod) []corev1.Pod {
+	var live []corev1.Pod
+	for _, p := range all {
+		if p.Status.Phase != corev1.PodFailed && p.Status.Phase != corev1.PodSucceeded {
+			live = append(live, p)
+		}
+	}
+	if len(live) == 0 {
+		return append([]corev1.Pod(nil), all...)
+	}
+	return live
 }
 
 func (o Options) layout() Layout {

@@ -102,6 +102,26 @@ func TestDiagnoseLLMLibcudaCrash(t *testing.T) {
 	}
 }
 
+// Reproduced on the lab cluster with examples/broken/llmisvc-tensor-parallel.yaml: vLLM 0.26 refuses a tensor
+// parallel size of 2 on a pod with one GPU, and its last line points at a pydantic help page.
+func TestDiagnoseLLMTensorParallelCrash(t *testing.T) {
+	errs := errorsOnly(DiagnoseLLM(loadLLMSnapshot(t, "llm-tensor-parallel")))
+	if len(errs) != 1 || errs[0].Title != "Server crashes on start" || errs[0].Logs == nil || !errs[0].Logs.Scan {
+		t.Fatalf("want one crash finding that asks for a log scan, got %+v", errs)
+	}
+	data, err := os.ReadFile(filepath.Join("testdata", fixtureLLM, "llm-tensor-parallel", "main-previous.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cause, evidence := ExplainLog(strings.Split(string(data), "\n"))
+	if cause == nil || !strings.Contains(cause.Meaning, "parallel size needs more GPUs") {
+		t.Fatalf("cause = %+v", cause)
+	}
+	if len(evidence) != 1 || !strings.Contains(evidence[0], "World size (2) is larger than the number of available GPUs (1)") {
+		t.Errorf("evidence = %q", evidence)
+	}
+}
+
 func TestExplainLogFallsBackToErrorLines(t *testing.T) {
 	lines := []string{
 		"(APIServer pid=1) INFO starting",

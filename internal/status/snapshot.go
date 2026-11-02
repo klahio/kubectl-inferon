@@ -49,6 +49,7 @@ type Snapshot struct {
 	HTTPRoutes     []unstructured.Unstructured
 	Gateways       []unstructured.Unstructured
 	Events         []corev1.Event
+	GPU            *GPU
 	// Unknown lists parts that could not be read (no permission, API not installed) with the reason.
 	// Those parts are shown as unknown instead of failing the command (docs/mvp.md section 3).
 	Unknown map[string]string
@@ -75,6 +76,7 @@ func Collect(ctx context.Context, c kube.Clients, namespace, name string, withEv
 	} else {
 		s.Pods = pods.Items
 	}
+	s.GPU = collectGPU(ctx, c, s.Pods, s.podComponent, s.Unknown)
 	if deps, err := c.Kube.AppsV1().Deployments(namespace).List(ctx, selector); err != nil {
 		s.markUnknown("deployments", err)
 	} else {

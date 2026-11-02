@@ -81,10 +81,11 @@ func newRootCommand(streams genericiooptions.IOStreams) *cobra.Command {
 		Use: PluginName,
 		// cobra takes the command name from the first word of Use; the display name makes help read "kubectl inferon".
 		Annotations: map[string]string{cobra.CommandDisplayNameAnnotation: commandPrefix() + PluginName},
-		Short:       "Diagnose a machine learning model inference service",
+		Short:       "Diagnose machine learning model inference services",
 		Version:     version.String(),
-		Long: "Diagnose, test and read the logs of a single machine learning model inference service: status, test and logs.\n" +
-			"Name the resource as TYPE/NAME. Currently supported: KServe isvc/NAME (InferenceService) and llmisvc/NAME (LLMInferenceService).",
+		Long: "Diagnose machine learning model inference services on Kubernetes.\n" +
+			"list prints them as TYPE/NAME; status, test and logs take that name.\n" +
+			"Supported types: isvc (InferenceService) and llmisvc (LLMInferenceService).",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -96,7 +97,7 @@ func newRootCommand(streams genericiooptions.IOStreams) *cobra.Command {
 	root.PersistentFlags().BoolVar(&opts.noColor, "no-color", false, "Turn off colored output (the NO_COLOR environment variable does the same)")
 
 	root.SetVersionTemplate("{{.DisplayName}} {{.Version}}\n")
-	root.AddCommand(newStatusCommand(opts), newTestCommand(opts), newLogsCommand(opts), &cobra.Command{
+	root.AddCommand(newListCommand(opts), newStatusCommand(opts), newTestCommand(opts), newLogsCommand(opts), &cobra.Command{
 		Use:   "version",
 		Short: "Print the plugin version",
 		Args:  cobra.NoArgs,

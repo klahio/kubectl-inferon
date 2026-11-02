@@ -1,0 +1,471 @@
+{
+  "apiVersion": "v1",
+  "items": [
+    {
+      "apiVersion": "gateway.networking.k8s.io/v1",
+      "kind": "HTTPRoute",
+      "metadata": {
+        "annotations": {
+          "serving.kserve.io/deploymentMode": "Standard"
+        },
+        "creationTimestamp": "2026-10-29T22:43:29Z",
+        "generation": 5,
+        "name": "sklearn-canary",
+        "namespace": "kserve-test",
+        "ownerReferences": [
+          {
+            "apiVersion": "serving.kserve.io/v1beta1",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "InferenceService",
+            "name": "sklearn-canary",
+            "uid": "8b8b0ff6-2a14-4e1a-aa67-0b44de5ca978"
+          }
+        ],
+        "resourceVersion": "9795083",
+        "uid": "4fbe41b7-a27e-45af-9742-77cba0848dcb"
+      },
+      "spec": {
+        "hostnames": [
+          "sklearn-canary-kserve-test.k8s.internal"
+        ],
+        "parentRefs": [
+          {
+            "group": "gateway.networking.k8s.io",
+            "kind": "Gateway",
+            "name": "lab-gateway",
+            "namespace": "gateway"
+          }
+        ],
+        "rules": [
+          {
+            "backendRefs": [
+              {
+                "group": "",
+                "kind": "Service",
+                "name": "sklearn-canary-predictor",
+                "namespace": "kserve-test",
+                "port": 80,
+                "weight": 80
+              },
+              {
+                "group": "",
+                "kind": "Service",
+                "name": "sklearn-canary-v2-predictor",
+                "namespace": "kserve-test",
+                "port": 80,
+                "weight": 20
+              }
+            ],
+            "filters": [
+              {
+                "requestHeaderModifier": {
+                  "set": [
+                    {
+                      "name": "KServe-Isvc-Name",
+                      "value": "sklearn-canary"
+                    },
+                    {
+                      "name": "KServe-Isvc-Namespace",
+                      "value": "kserve-test"
+                    }
+                  ]
+                },
+                "type": "RequestHeaderModifier"
+              }
+            ],
+            "matches": [
+              {
+                "path": {
+                  "type": "RegularExpression",
+                  "value": "^/.*$"
+                }
+              }
+            ],
+            "timeouts": {
+              "request": "60s"
+            }
+          }
+        ]
+      },
+      "status": {
+        "parents": [
+          {
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-10-31T16:32:34Z",
+                "message": "Accepted HTTPRoute",
+                "observedGeneration": 5,
+                "reason": "Accepted",
+                "status": "True",
+                "type": "Accepted"
+              },
+              {
+                "lastTransitionTime": "2026-10-31T16:32:34Z",
+                "message": "Service reference is valid",
+                "observedGeneration": 5,
+                "reason": "ResolvedRefs",
+                "status": "True",
+                "type": "ResolvedRefs"
+              }
+            ],
+            "controllerName": "io.cilium/gateway-controller",
+            "parentRef": {
+              "group": "gateway.networking.k8s.io",
+              "kind": "Gateway",
+              "name": "lab-gateway",
+              "namespace": "gateway"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "gateway.networking.k8s.io/v1",
+      "kind": "HTTPRoute",
+      "metadata": {
+        "annotations": {
+          "serving.kserve.io/deploymentMode": "Standard"
+        },
+        "creationTimestamp": "2026-10-29T22:43:29Z",
+        "generation": 5,
+        "name": "sklearn-canary-predictor",
+        "namespace": "kserve-test",
+        "ownerReferences": [
+          {
+            "apiVersion": "serving.kserve.io/v1beta1",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "InferenceService",
+            "name": "sklearn-canary",
+            "uid": "8b8b0ff6-2a14-4e1a-aa67-0b44de5ca978"
+          }
+        ],
+        "resourceVersion": "9795079",
+        "uid": "a2b2bb2d-7911-4923-9ee4-418661151cc3"
+      },
+      "spec": {
+        "hostnames": [
+          "sklearn-canary-predictor-kserve-test.k8s.internal"
+        ],
+        "parentRefs": [
+          {
+            "group": "gateway.networking.k8s.io",
+            "kind": "Gateway",
+            "name": "lab-gateway",
+            "namespace": "gateway"
+          }
+        ],
+        "rules": [
+          {
+            "backendRefs": [
+              {
+                "group": "",
+                "kind": "Service",
+                "name": "sklearn-canary-predictor",
+                "namespace": "kserve-test",
+                "port": 80,
+                "weight": 80
+              },
+              {
+                "group": "",
+                "kind": "Service",
+                "name": "sklearn-canary-v2-predictor",
+                "namespace": "kserve-test",
+                "port": 80,
+                "weight": 20
+              }
+            ],
+            "filters": [
+              {
+                "requestHeaderModifier": {
+                  "set": [
+                    {
+                      "name": "KServe-Isvc-Name",
+                      "value": "sklearn-canary"
+                    },
+                    {
+                      "name": "KServe-Isvc-Namespace",
+                      "value": "kserve-test"
+                    }
+                  ]
+                },
+                "type": "RequestHeaderModifier"
+              }
+            ],
+            "matches": [
+              {
+                "path": {
+                  "type": "RegularExpression",
+                  "value": "^/.*$"
+                }
+              }
+            ],
+            "timeouts": {
+              "request": "60s"
+            }
+          }
+        ]
+      },
+      "status": {
+        "parents": [
+          {
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-10-31T16:32:34Z",
+                "message": "Accepted HTTPRoute",
+                "observedGeneration": 5,
+                "reason": "Accepted",
+                "status": "True",
+                "type": "Accepted"
+              },
+              {
+                "lastTransitionTime": "2026-10-31T16:32:34Z",
+                "message": "Service reference is valid",
+                "observedGeneration": 5,
+                "reason": "ResolvedRefs",
+                "status": "True",
+                "type": "ResolvedRefs"
+              }
+            ],
+            "controllerName": "io.cilium/gateway-controller",
+            "parentRef": {
+              "group": "gateway.networking.k8s.io",
+              "kind": "Gateway",
+              "name": "lab-gateway",
+              "namespace": "gateway"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "gateway.networking.k8s.io/v1",
+      "kind": "HTTPRoute",
+      "metadata": {
+        "annotations": {
+          "kubectl-isvc.klah.io/reconcile": "1793313662",
+          "serving.kserve.io/deploymentMode": "Standard"
+        },
+        "creationTimestamp": "2026-10-29T22:41:02Z",
+        "generation": 1,
+        "name": "sklearn-iris",
+        "namespace": "kserve-test",
+        "ownerReferences": [
+          {
+            "apiVersion": "serving.kserve.io/v1beta1",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "InferenceService",
+            "name": "sklearn-iris",
+            "uid": "b97902c1-9fda-4f23-b552-d532bcc72ad2"
+          }
+        ],
+        "resourceVersion": "8254394",
+        "uid": "ae5cb3bb-6ee9-4396-a4d6-c53d73671243"
+      },
+      "spec": {
+        "hostnames": [
+          "sklearn-iris-kserve-test.k8s.internal"
+        ],
+        "parentRefs": [
+          {
+            "group": "gateway.networking.k8s.io",
+            "kind": "Gateway",
+            "name": "lab-gateway",
+            "namespace": "gateway"
+          }
+        ],
+        "rules": [
+          {
+            "backendRefs": [
+              {
+                "group": "",
+                "kind": "Service",
+                "name": "sklearn-iris-predictor",
+                "namespace": "kserve-test",
+                "port": 80,
+                "weight": 1
+              }
+            ],
+            "filters": [
+              {
+                "requestHeaderModifier": {
+                  "set": [
+                    {
+                      "name": "KServe-Isvc-Name",
+                      "value": "sklearn-iris"
+                    },
+                    {
+                      "name": "KServe-Isvc-Namespace",
+                      "value": "kserve-test"
+                    }
+                  ]
+                },
+                "type": "RequestHeaderModifier"
+              }
+            ],
+            "matches": [
+              {
+                "path": {
+                  "type": "RegularExpression",
+                  "value": "^/.*$"
+                }
+              }
+            ],
+            "timeouts": {
+              "request": "60s"
+            }
+          }
+        ]
+      },
+      "status": {
+        "parents": [
+          {
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-10-29T22:41:02Z",
+                "message": "Accepted HTTPRoute",
+                "observedGeneration": 1,
+                "reason": "Accepted",
+                "status": "True",
+                "type": "Accepted"
+              },
+              {
+                "lastTransitionTime": "2026-10-29T22:41:02Z",
+                "message": "Service reference is valid",
+                "observedGeneration": 1,
+                "reason": "ResolvedRefs",
+                "status": "True",
+                "type": "ResolvedRefs"
+              }
+            ],
+            "controllerName": "io.cilium/gateway-controller",
+            "parentRef": {
+              "group": "gateway.networking.k8s.io",
+              "kind": "Gateway",
+              "name": "lab-gateway",
+              "namespace": "gateway"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "gateway.networking.k8s.io/v1",
+      "kind": "HTTPRoute",
+      "metadata": {
+        "annotations": {
+          "kubectl-isvc.klah.io/reconcile": "1793313662",
+          "serving.kserve.io/deploymentMode": "Standard"
+        },
+        "creationTimestamp": "2026-10-29T22:41:02Z",
+        "generation": 1,
+        "name": "sklearn-iris-predictor",
+        "namespace": "kserve-test",
+        "ownerReferences": [
+          {
+            "apiVersion": "serving.kserve.io/v1beta1",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "InferenceService",
+            "name": "sklearn-iris",
+            "uid": "b97902c1-9fda-4f23-b552-d532bcc72ad2"
+          }
+        ],
+        "resourceVersion": "8254382",
+        "uid": "7fd100dc-ad51-444e-989b-ac9829791f11"
+      },
+      "spec": {
+        "hostnames": [
+          "sklearn-iris-predictor-kserve-test.k8s.internal"
+        ],
+        "parentRefs": [
+          {
+            "group": "gateway.networking.k8s.io",
+            "kind": "Gateway",
+            "name": "lab-gateway",
+            "namespace": "gateway"
+          }
+        ],
+        "rules": [
+          {
+            "backendRefs": [
+              {
+                "group": "",
+                "kind": "Service",
+                "name": "sklearn-iris-predictor",
+                "namespace": "kserve-test",
+                "port": 80,
+                "weight": 1
+              }
+            ],
+            "filters": [
+              {
+                "requestHeaderModifier": {
+                  "set": [
+                    {
+                      "name": "KServe-Isvc-Name",
+                      "value": "sklearn-iris"
+                    },
+                    {
+                      "name": "KServe-Isvc-Namespace",
+                      "value": "kserve-test"
+                    }
+                  ]
+                },
+                "type": "RequestHeaderModifier"
+              }
+            ],
+            "matches": [
+              {
+                "path": {
+                  "type": "RegularExpression",
+                  "value": "^/.*$"
+                }
+              }
+            ],
+            "timeouts": {
+              "request": "60s"
+            }
+          }
+        ]
+      },
+      "status": {
+        "parents": [
+          {
+            "conditions": [
+              {
+                "lastTransitionTime": "2026-10-29T22:41:02Z",
+                "message": "Accepted HTTPRoute",
+                "observedGeneration": 1,
+                "reason": "Accepted",
+                "status": "True",
+                "type": "Accepted"
+              },
+              {
+                "lastTransitionTime": "2026-10-29T22:41:02Z",
+                "message": "Service reference is valid",
+                "observedGeneration": 1,
+                "reason": "ResolvedRefs",
+                "status": "True",
+                "type": "ResolvedRefs"
+              }
+            ],
+            "controllerName": "io.cilium/gateway-controller",
+            "parentRef": {
+              "group": "gateway.networking.k8s.io",
+              "kind": "Gateway",
+              "name": "lab-gateway",
+              "namespace": "gateway"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "kind": "List",
+  "metadata": {
+    "resourceVersion": ""
+  }
+}

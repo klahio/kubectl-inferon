@@ -165,8 +165,11 @@ func ChooseLLMProtocol(flag string, body []byte) (Choice, error) {
 }
 
 // PrepareOpenAI builds or completes an OpenAI request body: --prompt becomes a chat request with one user message,
-// and a missing "model" is filled in. Streaming is not supported in version 0.1.
-func PrepareOpenAI(body []byte, prompt, model string, maxTokens int) ([]byte, error) {
+// and a missing "model" is filled in.
+//
+// With stream, or when the input already asks for "stream": true, the request streams its answer, and the second
+// result says so. Streaming requests also ask for the token usage, which the last chunk then carries.
+func PrepareOpenAI(body []byte, prompt, model string, maxTokens int, stream bool) ([]byte, bool, error) {
 	var req map[string]any
 	if prompt != "" {
 		req = map[string]any{
@@ -174,17 +177,30 @@ func PrepareOpenAI(body []byte, prompt, model string, maxTokens int) ([]byte, er
 			"max_tokens": maxTokens,
 		}
 	} else if err := json.Unmarshal(body, &req); err != nil {
-		return nil, fmt.Errorf("the input is not a JSON object: %w", err)
+		return nil, false, fmt.Errorf("the input is not a JSON object: %w", err)
 	} else if req == nil {
-		return nil, errors.New("the input is not a JSON object: null")
+		return nil, false, errors.New("the input is not a JSON object: null")
 	}
-	if stream, _ := req["stream"].(bool); stream {
-		return nil, errors.New(`"stream": true is not supported yet; remove it to get one complete response`)
+	if asked, _ := req["stream"].(bool); asked {
+		stream = true
+	}
+	if stream {
+		req["stream"] = true
+		// Keep options the input sets, but always ask for the usage, which the rate is computed from.
+		opts, _ := req["stream_options"].(map[string]any)
+		if opts == nil {
+			opts = map[string]any{}
+		}
+		if _, ok := opts["include_usage"]; !ok {
+			opts["include_usage"] = true
+		}
+		req["stream_options"] = opts
 	}
 	if _, ok := req["model"]; !ok && model != "" {
 		req["model"] = model
 	}
-	return json.Marshal(req)
+	data, err := json.Marshal(req)
+	return data, stream, err
 }
 
 // ModelOf returns the "model" field of an OpenAI request body.
@@ -205,7 +221,7 @@ func parse(s string) (Protocol, error) {
 	case "openai":
 		return OpenAI, nil
 	case "grpc-v1", "grpc-v2":
-		return "", fmt.Errorf("%s is a gRPC protocol; version 0.1 sends HTTP requests only (v1, v2 or openai)", s)
+		return "", fmt.Errorf("%s is a gRPC protocol; the plugin sends HTTP requests only (v1, v2 or openai)", s)
 	default:
 		return "", fmt.Errorf("unknown protocol %q (use v1, v2 or openai)", s)
 	}

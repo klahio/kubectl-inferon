@@ -14,6 +14,14 @@ Model
 Components
   predictor   Ready   replicas 1/1   autoscaling 1–1 (cpu 80%)
 
+Startup   pod/sklearn-iris-predictor-d98b9d78d-thfn6
+  scheduling       0s
+  pod start        8s    image pull and container start
+  model download   13s
+  server start     9s    image pull and container start
+  model load       10s   until ready
+  total            40s
+
 Conditions
   Ready            True
   IngressReady     True

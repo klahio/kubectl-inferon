@@ -1,0 +1,30 @@
+# Deliberately broken sample (docs/mvp.md section 7): examples/llmisvc-smollm.yaml with --tensor-parallel-size=2 on a
+# pod that gets one GPU. vLLM 0.26 exits with "World size (2) is larger than the number of available GPUs (1)", and its
+# last log line points at a pydantic help page. Uses one time-sliced GPU slot while it restarts; delete it after testing.
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: llm-tensor-parallel
+spec:
+  model:
+    uri: hf://HuggingFaceTB/SmolLM2-135M-Instruct
+    name: HuggingFaceTB/SmolLM2-135M-Instruct
+  replicas: 1
+  template:
+    runtimeClassName: nvidia
+    containers:
+      - name: main
+        env:
+          - name: VLLM_ADDITIONAL_ARGS
+            value: "--tensor-parallel-size=2 --gpu-memory-utilization=0.3 --max-model-len=4096"
+          - name: TRITON_LIBCUDA_PATH
+            value: /usr/lib/x86_64-linux-gnu
+        resources:
+          requests:
+            cpu: "1"
+            memory: 4Gi
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "4"
+            memory: 8Gi
+            nvidia.com/gpu: "1"

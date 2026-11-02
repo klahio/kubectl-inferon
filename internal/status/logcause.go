@@ -19,12 +19,25 @@ type LogCause struct {
 	Hint     string
 }
 
-// knownCauses is the starting set from the specification; each new case gets a fixture.
+// knownCauses is the set from the specification. Cases reproduced on the lab cluster have a fixture; the others
+// match messages from the vLLM, PyTorch and transformers sources (docs/mvp.md section 6a.2).
 var knownCauses = []LogCause{
 	{
 		Patterns: []string{"cannot find -l:libcuda.so.1"},
 		Meaning:  "Triton cannot find the NVIDIA driver library libcuda.so.1",
 		Hint:     "set TRITON_LIBCUDA_PATH to the node's driver directory: /usr/lib/x86_64-linux-gnu on Ubuntu or Debian nodes, /usr/lib64 on RHEL-family nodes",
+	},
+	{
+		// vLLM checks that one request of the full context fits in the KV cache; the wording changed across releases.
+		Patterns: []string{"larger than the maximum number of tokens that can be stored in kv cache", "larger than the available kv cache memory"},
+		Meaning:  "the KV cache is too small for one request of the full context length (--max-model-len)",
+		Hint:     "lower --max-model-len, or raise --gpu-memory-utilization",
+	},
+	{
+		// Typical on time-sliced or shared GPUs, where other processes hold part of the memory.
+		Patterns: []string{"less than desired gpu memory utilization"},
+		Meaning:  "other processes already use the GPU memory that --gpu-memory-utilization asks for",
+		Hint:     "lower --gpu-memory-utilization; a time-sliced GPU shares its memory with every pod on it",
 	},
 	{
 		Patterns: []string{"cuda out of memory", "no available memory for the cache blocks", "torch.outofmemoryerror"},
@@ -37,7 +50,29 @@ var knownCauses = []LogCause{
 		Hint:     "check the GPU request (nvidia.com/gpu) and, where the cluster needs one, runtimeClassName",
 	},
 	{
-		Patterns: []string{"gated repo", "401 client error", "access to model", "is restricted"},
+		// vLLM 0.26 on the lab cluster: "World size (2) is larger than the number of available GPUs (1) in this node".
+		Patterns: []string{"is larger than the number of available gpus", "cannot be larger than the number of available gpus", "exceeds the total number of available gpus"},
+		Meaning:  "the tensor or pipeline parallel size needs more GPUs than the pod has",
+		Hint:     "request as many GPUs as tensor × pipeline parallel size (spec.parallelism in an LLMInferenceService), or lower the parallel size",
+	},
+	{
+		Patterns: []string{"error while creating shared memory segment", "unable to write to file </torch_"},
+		Meaning:  "the container's shared memory (/dev/shm) is too small",
+		Hint:     "mount an emptyDir with medium: Memory at /dev/shm",
+	},
+	{
+		Patterns: []string{"] are not supported for now"},
+		Meaning:  "this vLLM version does not support the model's architecture",
+		Hint:     "use a newer vLLM image, or a model with a supported architecture",
+	},
+	{
+		// The error wording only: with the flag on, vLLM's start-up config line also contains "trust_remote_code=True".
+		Patterns: []string{"pass the argument `trust_remote_code=true`"},
+		Meaning:  "the model needs custom code from its repository",
+		Hint:     "add --trust-remote-code to the vLLM arguments if you trust the model repository",
+	},
+	{
+		Patterns: []string{"gated repo", "401 client error", "access to model"},
 		Meaning:  "Hugging Face refuses the model download",
 		Hint:     "provide a Hugging Face token Secret for gated or private models",
 	},

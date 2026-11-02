@@ -31,6 +31,7 @@ type LLMSnapshot struct {
 	HTTPRoutes  []unstructured.Unstructured
 	Gateways    []unstructured.Unstructured
 	Events      []corev1.Event
+	GPU         *GPU
 	// LWSMissing is set when the service needs LeaderWorkerSet and the cluster does not serve it.
 	LWSMissing bool
 	Unknown    map[string]string
@@ -54,6 +55,7 @@ func CollectLLM(ctx context.Context, c kube.Clients, namespace, name string, wit
 	} else {
 		s.Pods = pods.Items
 	}
+	s.GPU = collectGPU(ctx, c, s.Pods, llmPodRole, s.Unknown)
 	if deps, err := c.Kube.AppsV1().Deployments(namespace).List(ctx, selector); err != nil {
 		s.Unknown["deployments"] = reason(err)
 	} else {
@@ -146,6 +148,8 @@ func DiagnoseLLM(s *LLMSnapshot) []Finding {
 		}
 	})...)
 
+	explainGPUShortage(out, s.GPU, s.Pods)
+
 	if len(errorsOnly(out)) == 0 && !hasInfo(out) && m.Ready() != "True" {
 		var details []string
 		for _, c := range m.Conditions {
@@ -181,6 +185,8 @@ type LLMSummary struct {
 	Endpoints  Endpoints         `json:"endpoints"`
 	Model      LLMModel          `json:"model"`
 	Workloads  []WorkloadState   `json:"workloads"`
+	GPU        *GPU              `json:"gpu,omitempty"`
+	Startup    *Startup          `json:"startup,omitempty"`
 	Conditions []isvc.Condition  `json:"conditions"`
 	Findings   []Finding         `json:"findings"`
 	Unknown    map[string]string `json:"unknown,omitempty"`
@@ -259,6 +265,10 @@ func SummarizeLLM(s *LLMSnapshot, findings []Finding) *LLMSummary {
 	}
 	markBroken(sum.Endpoints.Exposure, findings)
 	sum.Workloads = workloads(s)
+	sum.GPU = s.GPU
+	if p := newestPod(s.Pods, func(p *corev1.Pod) bool { return llmPodRole(p) == llmisvc.RolePrimary }); p != nil {
+		sum.Startup = startupOf(p, isvc.ContainerStorageInitial, llmisvc.ContainerServer)
+	}
 	return sum
 }
 

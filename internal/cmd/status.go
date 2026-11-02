@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -39,9 +40,9 @@ func newStatusCommand(root *rootOptions) *cobra.Command {
 	o := &statusOptions{rootOptions: root}
 	c := &cobra.Command{
 		Use:   "status (isvc|llmisvc)/NAME",
-		Short: "Show a one-screen summary of an InferenceService or LLMInferenceService and diagnose why it is not working",
-		Example: fmt.Sprintf(`  %[1]s%[2]s status isvc/sklearn-iris -n kserve-test
-  %[1]s%[2]s status llmisvc/smollm -n kserve-test
+		Short: "Summarize an inference service and diagnose why it is not serving",
+		Example: fmt.Sprintf(`  %[1]s%[2]s status isvc/sklearn-iris -n models
+  %[1]s%[2]s status llmisvc/smollm -n models
   %[1]s%[2]s status isvc/sklearn-iris -o json
   %[1]s%[2]s status isvc/sklearn-iris --exit-code   # exit 1 when not Ready`, commandPrefix(), PluginName),
 		Args: cobra.ExactArgs(1),
@@ -131,7 +132,7 @@ func (o *statusOptions) once(ctx context.Context, clients kube.Clients, namespac
 	}
 	if !snap.ISVC.ModeSupported() && snap.ISVC.Mode != "" {
 		return false, &ExitError{Code: ExitFailure, Err: fmt.Errorf(
-			"InferenceService %s/%s uses deployment mode %q; version 0.1 supports only Standard mode", namespace, name, snap.ISVC.Mode)}
+			"InferenceService %s/%s uses deployment mode %q; the plugin supports only Standard mode so far", namespace, name, snap.ISVC.Mode)}
 	}
 
 	findings := status.Diagnose(snap)
@@ -175,7 +176,7 @@ func addLogEvidence(ctx context.Context, clients kube.Clients, namespace string,
 			continue
 		}
 		if !f.Logs.Scan {
-			f.LogLines = tailLogs(ctx, clients, namespace, f.Logs, statusLogLines)
+			f.LogLines = shortLines(tailLogs(ctx, clients, namespace, f.Logs, statusLogLines))
 			continue
 		}
 		lines := tailLogs(ctx, clients, namespace, f.Logs, status.ScanLines)
@@ -186,11 +187,11 @@ func addLogEvidence(ctx context.Context, clients kube.Clients, namespace string,
 			// the cause; the first detail, exit code and restarts, stays.
 			f.Details = append(f.Details[:min(1, len(f.Details))], "cause: "+cause.Meaning)
 			f.Hint = cause.Hint
-			f.LogLines = evidence
+			f.LogLines = shortLines(evidence)
 		case len(evidence) > 0:
-			f.LogLines = evidence
+			f.LogLines = shortLines(evidence)
 		default:
-			f.LogLines = lastN(lines, statusLogLines)
+			f.LogLines = shortLines(lastN(lines, statusLogLines))
 		}
 	}
 }
@@ -219,11 +220,21 @@ func tailLogs(ctx context.Context, clients kube.Clients, namespace string, ref *
 	if err != nil {
 		return nil
 	}
+	// Lines stay whole here: the cause search needs them all, and long vLLM errors put the cause past 200 bytes.
 	var out []string
 	for _, l := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
 		if strings.TrimSpace(l) != "" {
-			out = append(out, truncate(l, 200))
+			out = append(out, l)
 		}
+	}
+	return out
+}
+
+// shortLines shortens log lines for display.
+func shortLines(lines []string) []string {
+	out := make([]string, len(lines))
+	for i, l := range lines {
+		out[i] = truncate(l, 200)
 	}
 	return out
 }
@@ -278,9 +289,13 @@ func clusterError(err error) error {
 	return &ExitError{Code: ExitClusterOrNF, Err: err}
 }
 
+// truncate cuts s to at most n bytes without splitting a UTF-8 character.
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
 	}
 	return s[:n] + "…"
 }

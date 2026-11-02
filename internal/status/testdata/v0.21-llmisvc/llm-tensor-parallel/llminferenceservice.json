@@ -1,0 +1,129 @@
+{
+  "apiVersion": "serving.kserve.io/v1alpha2",
+  "kind": "LLMInferenceService",
+  "metadata": {
+    "annotations": {},
+    "creationTimestamp": "2026-11-02T08:01:51Z",
+    "finalizers": [
+      "serving.kserve.io/llmisvc-finalizer"
+    ],
+    "generation": 1,
+    "name": "llm-tensor-parallel",
+    "namespace": "kserve-test",
+    "resourceVersion": "11644287",
+    "uid": "4fb78d15-27ab-4387-a794-1b05c0e8923b"
+  },
+  "spec": {
+    "model": {
+      "name": "HuggingFaceTB/SmolLM2-135M-Instruct",
+      "uri": "hf://HuggingFaceTB/SmolLM2-135M-Instruct"
+    },
+    "replicas": 1,
+    "template": {
+      "containers": [
+        {
+          "env": [
+            {
+              "name": "VLLM_ADDITIONAL_ARGS",
+              "value": "--tensor-parallel-size=2 --gpu-memory-utilization=0.3 --max-model-len=4096"
+            },
+            {
+              "name": "TRITON_LIBCUDA_PATH",
+              "value": "/usr/lib/x86_64-linux-gnu"
+            }
+          ],
+          "name": "main",
+          "resources": {
+            "limits": {
+              "cpu": "4",
+              "memory": "8Gi",
+              "nvidia.com/gpu": "1"
+            },
+            "requests": {
+              "cpu": "1",
+              "memory": "4Gi",
+              "nvidia.com/gpu": "1"
+            }
+          }
+        }
+      ],
+      "runtimeClassName": "nvidia"
+    }
+  },
+  "status": {
+    "addresses": [
+      {
+        "url": "http://llm-tensor-parallel-kserve-workload-svc.kserve-test.svc.cluster.local"
+      }
+    ],
+    "annotations": {
+      "serving.kserve.io/config-llm-decode-template": "kserve-config-llm-decode-template",
+      "serving.kserve.io/config-llm-decode-worker-data-parallel": "kserve-config-llm-decode-worker-data-parallel",
+      "serving.kserve.io/config-llm-prefill-template": "kserve-config-llm-prefill-template",
+      "serving.kserve.io/config-llm-prefill-worker-data-parallel": "kserve-config-llm-prefill-worker-data-parallel",
+      "serving.kserve.io/config-llm-router-route": "kserve-config-llm-router-route",
+      "serving.kserve.io/config-llm-scheduler": "kserve-config-llm-scheduler",
+      "serving.kserve.io/config-llm-scheduler-eppconfig-default": "kserve-config-llm-scheduler-eppconfig-default",
+      "serving.kserve.io/config-llm-scheduler-eppconfig-default-pd": "kserve-config-llm-scheduler-eppconfig-default-pd",
+      "serving.kserve.io/config-llm-scheduler-latency-predictor": "kserve-config-llm-scheduler-latency-predictor",
+      "serving.kserve.io/config-llm-template": "kserve-config-llm-template",
+      "serving.kserve.io/config-llm-tokenizer": "kserve-config-llm-tokenizer",
+      "serving.kserve.io/config-llm-tracing": "kserve-config-llm-tracing",
+      "serving.kserve.io/config-llm-worker-data-parallel": "kserve-config-llm-worker-data-parallel"
+    },
+    "appliedConfigs": [
+      {
+        "name": "kserve-config-llm-template",
+        "namespace": "kserve",
+        "source": "Preset"
+      }
+    ],
+    "conditions": [
+      {
+        "lastTransitionTime": "2026-11-02T08:02:27Z",
+        "message": "Deployment does not have minimum availability.",
+        "reason": "MinimumReplicasUnavailable",
+        "severity": "Info",
+        "status": "False",
+        "type": "MainWorkloadReady"
+      },
+      {
+        "lastTransitionTime": "2026-11-02T08:02:05Z",
+        "status": "True",
+        "type": "PresetsCombined"
+      },
+      {
+        "lastTransitionTime": "2026-11-02T08:02:27Z",
+        "message": "Deployment does not have minimum availability.",
+        "reason": "MinimumReplicasUnavailable",
+        "status": "False",
+        "type": "Ready"
+      },
+      {
+        "lastTransitionTime": "2026-11-02T08:02:05Z",
+        "status": "True",
+        "type": "RouterReady"
+      },
+      {
+        "lastTransitionTime": "2026-11-02T08:02:27Z",
+        "message": "Deployment does not have minimum availability.",
+        "reason": "MinimumReplicasUnavailable",
+        "status": "False",
+        "type": "WorkloadsReady"
+      }
+    ],
+    "observedGeneration": 1,
+    "workloads": {
+      "primary": {
+        "apiGroup": "apps",
+        "kind": "Deployment",
+        "name": "llm-tensor-parallel-kserve",
+        "readyReplicas": 0
+      },
+      "service": {
+        "kind": "Service",
+        "name": "llm-tensor-parallel-kserve-workload-svc"
+      }
+    }
+  }
+}

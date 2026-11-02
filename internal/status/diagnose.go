@@ -93,6 +93,7 @@ func Diagnose(s *Snapshot) []Finding {
 	}
 
 	out = append(out, exposureFindings(s)...)
+	explainGPUShortage(out, s.GPU, s.Pods)
 
 	// Nothing specific found, yet KServe says it is not Ready: show what KServe reports.
 	if len(errorsOnly(out)) == 0 && !hasInfo(out) && m.Ready() != "True" {
@@ -112,13 +113,14 @@ func Diagnose(s *Snapshot) []Finding {
 
 // podFindings reports at most one finding per pod: the first problem along init containers, then containers.
 // Identical findings across replicas are merged into one with a pod count.
-func podFindings(s *Snapshot) []Finding {
-	return diagnosePods(s.Pods, func(p *corev1.Pod) string {
-		if canary := s.ISVC.CanaryOf(p.Labels); canary != "" {
-			return "canary " + canary
-		}
-		return p.Labels[isvc.LabelComponent]
-	})
+func podFindings(s *Snapshot) []Finding { return diagnosePods(s.Pods, s.podComponent) }
+
+// podComponent names a pod's component for the output: predictor, transformer, explainer or "canary NAME".
+func (s *Snapshot) podComponent(p *corev1.Pod) string {
+	if canary := s.ISVC.CanaryOf(p.Labels); canary != "" {
+		return "canary " + canary
+	}
+	return p.Labels[isvc.LabelComponent]
 }
 
 // diagnosePods applies the pod rules to any set of pods; describe names a pod's component for the output.
@@ -130,7 +132,7 @@ func diagnosePods(all []corev1.Pod, describe func(*corev1.Pod) string) []Finding
 	var order []string
 	byKey := map[string]*keyed{}
 
-	pods := append([]corev1.Pod(nil), all...)
+	pods := livePodsPer(all, describe)
 	sort.SliceStable(pods, func(i, j int) bool { return componentRank(pods[i]) < componentRank(pods[j]) })
 
 	for i := range pods {
@@ -162,6 +164,42 @@ func diagnosePods(all []corev1.Pod, describe func(*corev1.Pod) string) []Finding
 	return out
 }
 
+// livePods drops pods that have stopped for good (phase Failed or Succeeded) when other pods are still running or
+// starting. Seen on the lab cluster: after a node restart the kubelet rejected old pods with UnexpectedAdmissionError,
+// and their ReplicaSet had already replaced them; their last container exit is history, not a crash. When only
+// stopped pods are left, they are the only evidence there is.
+func livePods(all []corev1.Pod) []corev1.Pod {
+	var live []corev1.Pod
+	for _, p := range all {
+		if p.Status.Phase != corev1.PodFailed && p.Status.Phase != corev1.PodSucceeded {
+			live = append(live, p)
+		}
+	}
+	if len(live) == 0 {
+		return append([]corev1.Pod(nil), all...)
+	}
+	return live
+}
+
+// livePodsPer applies livePods to each component on its own, so a running transformer does not hide the stopped
+// pods of a predictor that has nothing else left.
+func livePodsPer(all []corev1.Pod, component func(*corev1.Pod) string) []corev1.Pod {
+	groups := map[string][]corev1.Pod{}
+	var order []string
+	for _, p := range all {
+		c := component(&p)
+		if _, ok := groups[c]; !ok {
+			order = append(order, c)
+		}
+		groups[c] = append(groups[c], p)
+	}
+	var out []corev1.Pod
+	for _, c := range order {
+		out = append(out, livePods(groups[c])...)
+	}
+	return out
+}
+
 func podFinding(p *corev1.Pod, component string) (Finding, bool) {
 	object := "pod/" + p.Name
 	if component != "" {
@@ -172,7 +210,7 @@ func podFinding(p *corev1.Pod, component string) (Finding, bool) {
 		if c.Type == corev1.PodScheduled && c.Status == corev1.ConditionFalse {
 			return Finding{
 				Severity: SeverityError,
-				Title:    "Pod cannot be scheduled",
+				Title:    titleUnschedulable,
 				Details:  nonEmpty(c.Message),
 				Object:   object,
 				Hint:     "lower the resource requests, or free capacity on the nodes",
@@ -416,7 +454,10 @@ func hostOf(rawURL string) string {
 	return u.Hostname()
 }
 
-const titleNotRoutable = "External address not routable"
+const (
+	titleNotRoutable   = "External address not routable"
+	titleUnschedulable = "Pod cannot be scheduled"
+)
 
 func notRoutable(s *Snapshot, object, detail string) Finding {
 	f := Finding{

@@ -37,6 +37,7 @@ type testOptions struct {
 	output      string
 	prompt      string
 	maxTokens   int
+	stream      bool
 }
 
 func newTestCommand(root *rootOptions) *cobra.Command {
@@ -48,6 +49,7 @@ func newTestCommand(root *rootOptions) *cobra.Command {
   %[1]s%[2]s test isvc/sklearn-iris -f input.json -o summary
   cat input.json | %[1]s%[2]s test isvc/sklearn-iris -f - -o raw | jq .predictions
   %[1]s%[2]s test llmisvc/smollm --prompt "What is Kubernetes?"
+  %[1]s%[2]s test llmisvc/smollm --prompt "Hi" --stream         # time to first token and tokens per second
   %[1]s%[2]s test llmisvc/smollm -f chat.json -o summary          # OpenAI body with "messages"`, commandPrefix(), PluginName),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -64,12 +66,13 @@ func newTestCommand(root *rootOptions) *cobra.Command {
 	f.StringVarP(&o.filename, "filename", "f", "", "Request body file; - reads standard input")
 	f.StringVar(&o.prompt, "prompt", "", "Send an OpenAI chat request with this one user message instead of -f")
 	f.IntVar(&o.maxTokens, "max-tokens", 64, "max_tokens for --prompt")
+	f.BoolVar(&o.stream, "stream", false, "Stream the OpenAI answer and show the time to the first token and the tokens per second")
 	f.StringVar(&o.protocol, "protocol", "", "v1, v2 or openai (default: automatic)")
 	f.StringVar(&o.model, "model", "", "Model name (default: the InferenceService name; for an LLMInferenceService spec.model.name)")
-	f.StringVar(&o.url, "url", "", "Send to this base address instead of discovering one")
+	f.StringVar(&o.url, "url", "", "Send to this base address instead of choosing a route")
 	f.StringVar(&o.portForward, "port-forward", inference.PortForwardAuto, "auto, always or never")
 	f.StringArrayVarP(&o.headers, "header", "H", nil, `Extra request header "Name: value", repeatable`)
-	f.DurationVar(&o.timeout, "timeout", 30*time.Second, "Request timeout (default 2m for OpenAI requests, whose first request can be slow)")
+	f.DurationVar(&o.timeout, "timeout", 30*time.Second, "Request timeout (default 2m for OpenAI requests, because a freshly started model server can be slow to answer the first one)")
 	f.StringVarP(&o.output, "output", "o", inference.OutputPretty, "Output: "+strings.Join(inference.Outputs, ", "))
 	c.MarkFlagsOneRequired("filename", "prompt")
 	c.MarkFlagsMutuallyExclusive("filename", "prompt")
@@ -156,6 +159,9 @@ func (o *testOptions) run(ctx context.Context, name string) error {
 		fmt.Fprintf(o.streams.ErrOut, "warning: %s/%s is not Ready; `%s%s status %s` shows why\n", namespace, name, commandPrefix(), PluginName, arg)
 	}
 
+	if o.stream && choice.Protocol != inference.OpenAI {
+		return usage("--stream works only with OpenAI requests (--prompt, or an input with \"messages\" or \"prompt\"); this request uses protocol %s", choice.Protocol)
+	}
 	ep, err := inference.Discover(ctx, target, inference.DiscoverOptions{URL: o.url, PortForward: o.portForward})
 	if err != nil {
 		return discoverError(err)
@@ -171,7 +177,7 @@ func (o *testOptions) run(ctx context.Context, name string) error {
 				return &ExitError{Code: ExitFailure, Err: err}
 			}
 		}
-		if body, err = inference.PrepareOpenAI(body, o.prompt, model, o.maxTokens); err != nil {
+		if body, o.stream, err = inference.PrepareOpenAI(body, o.prompt, model, o.maxTokens, o.stream); err != nil {
 			return usage("%v", err)
 		}
 		if !o.timeoutSet {
@@ -185,6 +191,7 @@ func (o *testOptions) run(ctx context.Context, name string) error {
 		Body:     body,
 		Headers:  headers,
 		Timeout:  o.timeout,
+		Stream:   o.stream,
 	})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {

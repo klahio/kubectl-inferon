@@ -1,18 +1,19 @@
 # kubectl-inferon
 
-A kubectl plugin that diagnoses machine learning (ML) model inference services on Kubernetes: why a model is not serving, whether it answers a real request, and what its containers printed.
+A kubectl plugin that diagnoses machine learning (ML) model inference services on Kubernetes: why a model is not serving, whether it answers an inference request, and what its containers printed.
 
-An inference service turns into many Kubernetes objects: a serving runtime, Deployments, pods that download the model before the server starts, Services, an Ingress or Gateway API HTTPRoutes, and an autoscaler. When a model is not serving, the reason is usually several objects away, and the service's own status often points somewhere else: when a pod runs out of memory, it may report only that the ingress was not created.
+An inference service involves many Kubernetes objects: the serving runtime it selects, Deployments, pods that download the model before the server starts, Services, an Ingress or Gateway API HTTPRoutes, and an autoscaler. The service's status often names a different object from the one that failed. A pod that runs out of memory, for example, may show up only as an ingress that was not created.
 
-General pod diagnosis tools stop at the pod. `kubectl inferon` knows the path a model takes from storage to an answered request: the model download, the serving runtime that must support the model format, the model server's crash log (for vLLM it finds the actual cause, such as GPU out of memory, behind "Engine core initialization failed"), the Ingress or Gateway API route that must really reach the model, and the inference protocol the server speaks. It answers three questions with one command each:
+`kubectl inferon` checks the objects between the model in storage and a response: the model download, whether a serving runtime supports the model format, the model server's crash log (vLLM often ends with only "Engine core initialization failed", so it searches the earlier lines for the cause), the Ingress or HTTPRoute in front of the model, and the protocol the server speaks.
 
 | Question | Command |
 |---|---|
+| Which inference services are there, and which are broken? | `kubectl inferon list` |
 | Is my model serving, and if not, why? | `kubectl inferon status TYPE/NAME` |
 | Does it actually answer a request? | `kubectl inferon test TYPE/NAME -f input.json`, or `--prompt "..."` for an LLM |
 | What did its containers print? | `kubectl inferon logs TYPE/NAME` |
 
-**Currently supported**: [KServe](https://kserve.github.io/website/) **InferenceService** and **LLMInferenceService** (KServe's resource for large language models (LLMs) served with vLLM), in KServe's Standard deployment mode (not Knative serverless). Commands always take the resource as `TYPE/NAME`, the way kubectl does: `isvc/NAME` is an InferenceService, `llmisvc/NAME` is an LLMInferenceService. See [Compatibility](#compatibility) for versions.
+Start with `list`, which prints each service as `TYPE/NAME`, the argument the other commands take. The supported types are `isvc` (InferenceService) and `llmisvc` (LLMInferenceService, for large language models (LLMs) served with vLLM); [Compatibility](#compatibility) lists the platform versions.
 
 The plugin is read-only: it never creates, changes or deletes cluster objects.
 
@@ -34,15 +35,34 @@ go install github.com/klahio/kubectl-inferon@latest
 
 ## Usage
 
+### list: what is there
+
+```console
+$ kubectl inferon list -n models
+NAME                  READY     MODEL                                 PROBLEM                   AGE
+isvc/bad-storage      False     sklearn                               Model download failed     3d
+isvc/sklearn-canary   True      sklearn                               -                         3d
+isvc/sklearn-iris     True      sklearn                               -                         3d
+isvc/unschedulable    False     sklearn                               Pod cannot be scheduled   3d
+llmisvc/smollm        True      HuggingFaceTB/SmolLM2-135M-Instruct   -                         3d
+```
+
+The problem column comes from the same pod checks as `status`, run on one pod list for the whole namespace, so a long list stays fast. Routes and logs are left to `status`.
+
+| Flag | Meaning |
+|---|---|
+| `-A, --all-namespaces` | List in every namespace |
+| `-o name\|json\|yaml` | `name` prints one `TYPE/NAME` per line, for scripts |
+
 ### status: summary and diagnosis
 
 ```console
-$ kubectl inferon status isvc/sklearn-canary -n kserve-test
-sklearn-canary   namespace: kserve-test   mode: Standard   Ready   age: 14m
+$ kubectl inferon status isvc/sklearn-canary -n models
+sklearn-canary   namespace: models   mode: Standard   Ready   age: 14m
 
 Endpoints
-  external     https://sklearn-canary-kserve-test.k8s.internal
-  in-cluster   http://sklearn-canary-predictor.kserve-test.svc.cluster.local
+  external     https://sklearn-canary-models.k8s.internal
+  in-cluster   http://sklearn-canary-predictor.models.svc.cluster.local
   httproute    sklearn-canary   via Gateway gateway/lab-gateway   address: 192.168.4.30
 
 Model
@@ -67,7 +87,7 @@ Conditions
 When something is wrong, `status` follows the chain InferenceService → Deployment → pod → container and names the cause:
 
 ```console
-$ kubectl inferon status isvc/bad-storage -n kserve-test
+$ kubectl inferon status isvc/bad-storage -n models
 ...
 Diagnosis
   ✗ Model download failed   predictor pod/bad-storage-predictor-f4cfc7765-wxst8
@@ -78,6 +98,25 @@ Diagnosis
       hint: check spec.predictor.model.storageUri and the storage credentials
 ```
 
+Two more sections cover slow starts and GPU capacity:
+
+```console
+GPU
+  request   primary     nvidia.com/gpu 1 per pod (1 pod)
+  node      gpu-node-1  nvidia.com/gpu 4 allocatable, 1 requested, 3 free (1 by this service)
+
+Startup   pod/smollm-kserve-66c88967bb-fwtlh
+  scheduling       33s
+  pod start        1s      image pull and container start
+  model download   6m48s
+  server start     1s      image pull and container start
+  model load       5m      until ready
+  total            12m
+```
+
+- **GPU** appears when the pods request a GPU resource (`nvidia.com/gpu`, MIG slices, other vendors' `*gpu*` resources). It shows how much each node offers and how much is taken, across all namespaces. When a pod cannot be scheduled for lack of GPUs, the diagnosis adds how many are free on each node.
+- **Startup** splits the start of the newest server pod into phases, taken from the pod's conditions and container states. If a node restart recreated the pod later, the phases describe that run. A failed download or a crashing server ends the list with the failure.
+
 What it diagnoses:
 - model download failures
 - images that cannot be pulled
@@ -86,8 +125,8 @@ What it diagnoses:
 - model formats with no serving runtime
 - pods rejected by a quota or an admission policy
 - canaries that are not ready
-- an external address that cannot be reached, for both Ingress and Gateway API, even when KServe reports `IngressReady=True`
-- an Ingress left behind after switching KServe to Gateway API
+- an external address that cannot be reached, for both Ingress and Gateway API, even when the service reports `IngressReady=True`
+- an Ingress left behind after a switch to Gateway API
 
 | Flag | Meaning |
 |---|---|
@@ -99,8 +138,8 @@ What it diagnoses:
 ### test: smoke-test inference request
 
 ```console
-$ kubectl inferon test isvc/sklearn-iris -n kserve-test -f examples/iris-input.json
-POST https://sklearn-iris-kserve-test.k8s.internal/v1/models/sklearn-iris:predict
+$ kubectl inferon test isvc/sklearn-iris -n models -f examples/iris-input.json
+POST https://sklearn-iris-models.k8s.internal/v1/models/sklearn-iris:predict
   connected to 192.168.4.30:443
   protocol v1 (input has "instances") · via HTTPRoute sklearn-iris at 192.168.4.30:443
 200 OK · 6 ms
@@ -110,7 +149,7 @@ POST https://sklearn-iris-kserve-test.k8s.internal/v1/models/sklearn-iris:predic
 }
 ```
 
-You don't need to know the address. `test` uses the first route that answers (a TCP connection plus a `GET /` that gets an HTTP answer other than 502, 503 or 504):
+`test` finds the address itself. It uses the first route that answers, meaning a TCP connection succeeds and `GET /` returns an HTTP status other than 502, 503 or 504:
 1. `--url`, if given
 2. the external address, when `status` considers it routable and a healthy Ingress or HTTPRoute publishes it
 3. the external host name connected to the Ingress or Gateway address (like `curl --resolve`), when the name does not resolve on your machine
@@ -118,7 +157,7 @@ You don't need to know the address. `test` uses the first route that answers (a 
 
 The inference request itself is sent once, on the chosen route.
 
-You don't need to know the protocol either. `test` uses the first rule that gives an answer: `--protocol`, the InferenceService's `protocolVersion`, the shape of the input (`instances` means v1, `inputs` means the v2 Open Inference Protocol), the runtime's first protocol, and finally v1. If the choice contradicts the input or the runtime, or the server's `/openapi.json` lacks the path, `test` stops before sending the inference request.
+It picks the protocol in this order: `--protocol`, the InferenceService's `protocolVersion`, the shape of the input (`instances` means v1, `inputs` means the v2 Open Inference Protocol), the runtime's first protocol, and finally v1. If the choice contradicts the input or the runtime, or the server's `/openapi.json` lacks the path, `test` stops before sending the inference request.
 
 | Flag | Meaning |
 |---|---|
@@ -137,14 +176,14 @@ kubectl inferon logs isvc/sklearn-iris -c all -f # every component; follows new 
 kubectl inferon logs isvc/sklearn-iris -p        # the previous, crashed instance
 ```
 
-When more than one container is shown, each line is prefixed with `[component/pod/container]`. `--since`, `--tail` (default 100 lines; `-1` for all) and `--prefix auto|true|false` work as you would expect.
+When more than one container is shown, each line is prefixed with `[component/pod/container]`. `--since` and `--tail` (default 100 lines; `-1` for all) work as in `kubectl logs`. `--prefix auto` adds the prefix only when more than one stream is shown; `true` and `false` force it on or off.
 
 ### LLMInferenceService
 
-The same three commands work on `llmisvc/NAME`:
+`status`, `test` and `logs` also accept `llmisvc/NAME`:
 
 ```console
-$ kubectl inferon test llmisvc/smollm -n kserve-test --prompt "What is Kubernetes? Answer in one sentence."
+$ kubectl inferon test llmisvc/smollm -n models --prompt "What is Kubernetes? Answer in one sentence."
 POST http://127.0.0.1:44271/v1/chat/completions
   protocol openai (LLMInferenceService) · via port-forward to svc/smollm-kserve-workload-svc
 200 OK · 73 ms
@@ -165,8 +204,14 @@ model HuggingFaceTB/SmolLM2-135M-Instruct · finish stop · tokens 41 prompt + 2
       hint: set TRITON_LIBCUDA_PATH to the node's driver directory: /usr/lib/x86_64-linux-gnu on Ubuntu or Debian nodes, /usr/lib64 on RHEL-family nodes
   ```
 
-  Known causes so far: the driver library path above, GPU out of memory, no GPU visible, and a refused Hugging Face download.
-- `test llmisvc/NAME` sends OpenAI-compatible requests: `--prompt "text"` (with `--max-tokens`, default 64), or `-f` with a body that has `messages` (chat) or `prompt` (completion). The model name comes from the input, `spec.model.name`, or `/v1/models`. The same OpenAI mode works for InferenceServices on KServe's Hugging Face runtime, which serves the API under `/openai`. The default timeout is 2 minutes, because the first request to a freshly started model server can be slow. Streaming is not supported yet.
+  Known causes so far: the driver library path above, GPU out of memory, a KV cache too small for `--max-model-len`, GPU memory already taken by other processes (common on time-sliced GPUs), a tensor or pipeline parallel size larger than the pod's GPUs, no visible GPU, a `/dev/shm` that is too small, an unsupported model architecture, a model that needs `--trust-remote-code`, and a refused Hugging Face download.
+- `test llmisvc/NAME` sends OpenAI-compatible requests: `--prompt "text"` (with `--max-tokens`, default 64), or `-f` with a body that has `messages` (chat) or `prompt` (completion). The model name comes from the input, `spec.model.name`, or `/v1/models`. The same OpenAI mode works for InferenceServices on the Hugging Face runtime, which serves the API under `/openai`. The default timeout is 2 minutes, because the first request to a freshly started model server can be slow.
+- `--stream` (or `"stream": true` in the input) streams the response and reports the time to the first token and the tokens per second after it. The token count comes from the usage the server reports, or from the number of chunks when it reports none.
+
+  ```console
+  $ kubectl inferon test llmisvc/smollm -n models --prompt "Hi" --stream -o summary
+  HTTP 200 · 28 ms · via port-forward · "Hello! How can I help you today?" · 31+10 tokens · first token 14 ms · 650.7 tokens/s after it
+  ```
 - `logs llmisvc/NAME` shows the vLLM container `main`; `-c` picks `main`, `prefill`, `scheduler`, `worker` or `all`.
 
 ### Common flags and exit codes
@@ -178,7 +223,7 @@ Every command takes the usual kubectl connection flags: `-n`, `--context`, `--ku
 | 0 | Success |
 | 1 | The command ran but the result is a failure: a non-2xx response, `status --exit-code` on a service that is not Ready, or no readable log |
 | 2 | Wrong usage or bad input |
-| 3 | Cluster unreachable, InferenceService not found, or permission denied |
+| 3 | Cluster unreachable, resource not found, or permission denied |
 
 ## Compatibility
 
@@ -199,6 +244,8 @@ The plugin reads KServe objects as unstructured data and checks for fields rathe
 - cluster-wide `get` and `list` on `clusterservingruntimes` and `ingressclasses`, and `get` on the `gateways` an HTTPRoute attaches to (often in another namespace)
 - for LLMInferenceServices also `llminferenceservices` and, for multi-node services, `leaderworkersets`
 - `get` and `create` on `pods/portforward`, for `test` (newer API servers open port-forwards over WebSockets, which needs `get`)
+- for `list -A`, `list` on the service types and on `pods` in every namespace
+- optional, for the GPU section: cluster-wide `list` on `nodes` and `pods`
 
 A missing permission on an optional object shows up as "not checked" instead of failing the command.
 

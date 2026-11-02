@@ -7,6 +7,7 @@ import (
 	"time"
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/klahio/kubectl-inferon/internal/isvc"
@@ -26,6 +27,8 @@ type Summary struct {
 	ModelStatus isvc.ModelStatus  `json:"modelStatus"`
 	Components  []ComponentState  `json:"components"`
 	Canary      *CanarySplit      `json:"canary,omitempty"`
+	GPU         *GPU              `json:"gpu,omitempty"`
+	Startup     *Startup          `json:"startup,omitempty"`
 	Conditions  []isvc.Condition  `json:"conditions"`
 	Findings    []Finding         `json:"findings"`
 	Warnings    []string          `json:"warnings,omitempty"`
@@ -119,6 +122,7 @@ func Summarize(s *Snapshot, findings []Finding) *Summary {
 		Conditions:  m.Conditions,
 		Findings:    findings,
 		Unknown:     s.Unknown,
+		GPU:         s.GPU,
 		Endpoints: Endpoints{
 			External:  m.URL,
 			InCluster: m.AddressURL,
@@ -144,6 +148,12 @@ func Summarize(s *Snapshot, findings []Finding) *Summary {
 
 	for _, c := range m.Components {
 		sum.Components = append(sum.Components, componentState(s, c.Name))
+	}
+
+	if p := newestPod(s.Pods, func(p *corev1.Pod) bool {
+		return p.Labels[isvc.LabelComponent] == "predictor" && m.CanaryOf(p.Labels) == ""
+	}); p != nil {
+		sum.Startup = startupOf(p, isvc.ContainerStorageInitial, isvc.ContainerServer)
 	}
 
 	if len(m.Canaries) > 0 {

@@ -305,7 +305,7 @@ func TestChooseProtocolOpenAIPaths(t *testing.T) {
 }
 
 func TestPrepareOpenAI(t *testing.T) {
-	body, err := PrepareOpenAI(nil, "What is Kubernetes?", "m", 64)
+	body, _, err := PrepareOpenAI(nil, "What is Kubernetes?", "m", 64, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,15 +319,20 @@ func TestPrepareOpenAI(t *testing.T) {
 	if err := json.Unmarshal(body, &req); err != nil || req.Model != "m" || req.MaxTokens != 64 || len(req.Messages) != 1 || req.Messages[0].Content != "What is Kubernetes?" {
 		t.Errorf("prompt body = %s, %v", body, err)
 	}
-	kept, err := PrepareOpenAI([]byte(`{"model":"mine","prompt":"x"}`), "", "other", 64)
+	kept, _, err := PrepareOpenAI([]byte(`{"model":"mine","prompt":"x"}`), "", "other", 64, false)
 	if err != nil || ModelOf(kept) != "mine" {
 		t.Errorf("an explicit model must be kept: %s, %v", kept, err)
 	}
-	if _, err := PrepareOpenAI([]byte(`{"messages":[],"stream":true}`), "", "m", 64); err == nil {
-		t.Error("streaming must be refused in version 0.1")
+	// "stream": true in the input turns streaming on, and the usage is asked for so the rate can be measured.
+	streamed, stream, err := PrepareOpenAI([]byte(`{"messages":[],"stream":true}`), "", "m", 64, false)
+	if err != nil || !stream || !strings.Contains(string(streamed), `"include_usage":true`) {
+		t.Errorf("stream from the input: %s, %v, %v", streamed, stream, err)
+	}
+	if _, stream, _ := PrepareOpenAI(nil, "hi", "m", 64, true); !stream {
+		t.Error("--stream must stream")
 	}
 	// null passes json.Unmarshal into a map and used to panic when the model was filled in.
-	if _, err := PrepareOpenAI([]byte(`null`), "", "m", 64); err == nil {
+	if _, _, err := PrepareOpenAI([]byte(`null`), "", "m", 64, false); err == nil {
 		t.Error("a null body must be refused")
 	}
 	if _, err := shapeOf([]byte(`null`)); err == nil {

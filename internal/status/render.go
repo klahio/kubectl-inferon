@@ -152,6 +152,8 @@ func (r TextRenderer) Render(w io.Writer, s *Summary) error {
 		}
 		tw.Flush()
 	}
+	r.renderGPU(p, s.GPU)
+	r.renderStartup(p, s.Startup, now)
 
 	r.renderTail(p, s.Conditions, s.Findings, s.Unknown)
 	return p.err
@@ -282,6 +284,8 @@ func (r TextRenderer) RenderLLM(w io.Writer, s *LLMSummary) error {
 		fmt.Fprintln(tw, "  (none created yet)")
 	}
 	tw.Flush()
+	r.renderGPU(p, s.GPU)
+	r.renderStartup(p, s.Startup, now)
 
 	r.renderTail(p, s.Conditions, s.Findings, s.Unknown)
 	return p.err

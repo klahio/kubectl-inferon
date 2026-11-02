@@ -7,29 +7,30 @@ spec:
   homepage: https://github.com/klahio/kubectl-inferon
   shortDescription: Diagnose machine learning inference services
   description: |
-    Diagnoses machine learning model inference services on Kubernetes, where
-    general pod diagnosis tools stop short: it knows the path a model takes
-    from storage to an answered request.
+    Diagnoses InferenceServices and LLMInferenceServices on Kubernetes:
+    the model download, the serving runtime, the model server's crash log,
+    the Ingress or Gateway API route, and one inference request.
 
-    - Model loading: a failed model download in the init container, a model
-      format that no serving runtime supports, a model server that crashes
-      or runs out of memory while loading. For vLLM servers it searches the
-      crash log for the actual cause (driver library not found, GPU out of
-      memory, no GPU visible, a refused Hugging Face download), because the
-      last line is usually just "Engine core initialization failed".
-    - Request path: whether the external address really reaches the model
-      through the Ingress or the Gateway API route, even when the service
-      reports itself ready, and routes left behind after a migration.
-    - A real inference request: the test command finds a working route
-      (falling back to port-forward) and the protocol (v1, the v2 Open
-      Inference Protocol, or OpenAI chat for language models), sends one
-      request and shows the answer.
-    - Logs by role: the model server, the model download, or every
-      component, without pod names.
+    - list shows each service as TYPE/NAME with its readiness and the first
+      problem found in its pods. The other commands take that TYPE/NAME.
+    - status reports a failed model download, a model format that no
+      serving runtime supports, and a server that crashes or runs out of
+      memory. For vLLM it searches the crash log for the cause (driver
+      library not found, GPU or KV cache memory too small, a parallel size
+      larger than the pod's GPUs, a refused Hugging Face download), because
+      the last line is often only "Engine core initialization failed". It
+      shows how long each start phase took, how many GPUs each node has
+      free, and whether the external address reaches the model even when
+      IngressReady is True.
+    - test picks a route that answers (falling back to port-forward) and a
+      protocol (v1, v2 Open Inference Protocol, or OpenAI), and sends one
+      request. With --stream it also reports the time to the first token
+      and the tokens per second.
+    - logs prints the model server, the model download or every component,
+      without pod names.
 
     Currently supports KServe v0.16 to v0.21: InferenceService in Standard
-    mode (Ingress or Gateway API, canary rollouts) and LLMInferenceService.
-    Read-only: it never changes the cluster.
+    mode and LLMInferenceService. Read-only: it never changes the cluster.
   caveats: |
     The plugin only reads cluster objects. The test command also needs get
     and create permission on pods/portforward when it falls back to

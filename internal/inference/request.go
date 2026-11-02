@@ -22,6 +22,8 @@ type Request struct {
 	Body     []byte
 	Headers  http.Header
 	Timeout  time.Duration
+	// Stream reads an OpenAI server-sent event stream and measures the time to the first token.
+	Stream bool
 }
 
 // Result is what came back.
@@ -41,10 +43,25 @@ type Result struct {
 	JSONBody any `json:"body,omitempty"`
 	// TextBody holds a body that is not JSON.
 	TextBody string `json:"bodyText,omitempty"`
+	// Streamed is set when the answer came as a stream; Body then holds the raw events and JSONBody the
+	// answer put together from them.
+	Streamed bool `json:"streamed,omitempty"`
+	// FirstTokenMs is the time until the first chunk with text arrived.
+	FirstTokenMs *int64 `json:"firstTokenMs,omitempty"`
+	// TokensPerSecond is the generation rate after the first token: completion tokens other than the first,
+	// divided by the time between the first token and the end of the stream.
+	TokensPerSecond *float64 `json:"tokensPerSecond,omitempty"`
+	// TokensCounted is set when the server sent no usage, so the tokens were counted as the chunks with text.
+	TokensCounted bool `json:"tokensCountedFromChunks,omitempty"`
+	// StreamError is an error event in the stream, or a stream that ended early; the request then failed even
+	// though the status was 200.
+	StreamError string `json:"streamError,omitempty"`
+
+	streamed *answer
 }
 
-// OK reports a 2xx response.
-func (r *Result) OK() bool { return r.StatusCode >= 200 && r.StatusCode < 300 }
+// OK reports a 2xx response, and for a stream one that completed without an error event.
+func (r *Result) OK() bool { return r.StatusCode >= 200 && r.StatusCode < 300 && r.StreamError == "" }
 
 // CheckPath looks the request path up in the server's /openapi.json, if it publishes one, so a request that is
 // bound to fail is never sent. A server without the document (or an unreadable one) skips the check.
@@ -117,7 +134,17 @@ func Send(ctx context.Context, r Request) (*Result, error) {
 		return nil, fmt.Errorf("request to %s failed: %w", req.URL, err)
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	// An error answer to a streaming request is plain JSON; only an event stream is read chunk by chunk.
+	var st *stream
+	if r.Stream && resp.StatusCode >= 200 && resp.StatusCode < 300 && strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+		st = &stream{}
+	}
+	var body []byte
+	if st != nil {
+		body, err = st.read(resp.Body, start)
+	} else {
+		body, err = io.ReadAll(resp.Body)
+	}
 	elapsed := time.Since(start)
 	if err != nil {
 		return nil, fmt.Errorf("reading the response: %w", err)
@@ -135,6 +162,10 @@ func Send(ctx context.Context, r Request) (*Result, error) {
 		Duration:   elapsed,
 		DurationMs: elapsed.Milliseconds(),
 		Body:       body,
+	}
+	if st != nil {
+		st.finish(res, elapsed)
+		return res, nil
 	}
 	var parsed any
 	if json.Unmarshal(body, &parsed) == nil {

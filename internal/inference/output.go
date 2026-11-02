@@ -33,7 +33,7 @@ func Write(w io.Writer, format string, r *Result) error {
 		enc.SetIndent("", "  ")
 		return enc.Encode(r)
 	case OutputSummary:
-		_, err := fmt.Fprintf(w, "HTTP %d · %d ms · via %s · %s\n", r.StatusCode, r.DurationMs, shortRoute(r.Route), summarize(r))
+		_, err := fmt.Fprintf(w, "HTTP %d · %d ms · via %s · %s%s\n", r.StatusCode, r.DurationMs, shortRoute(r.Route), summarize(r), streamMetrics(r, " · "))
 		return err
 	default:
 		var b strings.Builder
@@ -43,15 +43,36 @@ func Write(w io.Writer, format string, r *Result) error {
 		}
 		fmt.Fprintf(&b, "  protocol %s (%s) · via %s\n", r.Protocol, r.ProtocolBy, r.Route)
 		fmt.Fprintf(&b, "%s · %d ms\n\n", r.Status, r.DurationMs)
-		if a, ok := openAIAnswer(r); ok && r.OK() {
+		if r.StreamError != "" {
+			fmt.Fprintf(&b, "stream error: %s\n", r.StreamError)
+		}
+		if a, ok := openAIAnswer(r); ok && r.StatusCode >= 200 && r.StatusCode < 300 {
 			b.WriteString(a.Text + "\n\n")
 			fmt.Fprintf(&b, "model %s · finish %s · tokens %d prompt + %d completion\n", dash(a.Model), dash(a.Finish), a.PromptTokens, a.CompletionTokens)
+			if m := streamMetrics(r, ""); m != "" {
+				b.WriteString(m + "\n")
+			}
 		} else {
 			b.WriteString(prettyBody(r))
 		}
 		_, err := io.WriteString(w, b.String())
 		return err
 	}
+}
+
+// streamMetrics prints the time to the first token and the generation rate of a streamed answer, after sep.
+func streamMetrics(r *Result, sep string) string {
+	if r.FirstTokenMs == nil {
+		return ""
+	}
+	s := fmt.Sprintf("%sfirst token %d ms", sep, *r.FirstTokenMs)
+	if r.TokensPerSecond != nil {
+		s += fmt.Sprintf(" · %.1f tokens/s after it", *r.TokensPerSecond)
+	}
+	if r.TokensCounted {
+		s += " (tokens counted as chunks; the server sent no usage)"
+	}
+	return s
 }
 
 func prettyBody(r *Result) string {
@@ -69,6 +90,9 @@ func prettyBody(r *Result) string {
 
 // summarize picks the interesting part of a body: v1 predictions, v2 outputs, an error message, or the body itself.
 func summarize(r *Result) string {
+	if r.StreamError != "" {
+		return "stream error: " + shorten(r.StreamError)
+	}
 	if a, ok := openAIAnswer(r); ok {
 		return fmt.Sprintf("%q · %d+%d tokens", shorten(strings.Join(strings.Fields(a.Text), " ")), a.PromptTokens, a.CompletionTokens)
 	}
@@ -134,6 +158,9 @@ type answer struct {
 func openAIAnswer(r *Result) (answer, bool) {
 	if r.Protocol != OpenAI {
 		return answer{}, false
+	}
+	if r.streamed != nil {
+		return *r.streamed, true
 	}
 	var resp struct {
 		Model   string `json:"model"`
