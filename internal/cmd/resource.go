@@ -39,14 +39,15 @@ var (
 	}
 )
 
-// resourceArg accepts NAME or TYPE/NAME, as kubectl does. A bare NAME means an InferenceService.
+// resourceArg accepts TYPE/NAME, as kubectl does. The type is required: a bare NAME would become ambiguous once
+// the plugin handles more than one serving platform.
 func resourceArg(arg string) (Kind, string, error) {
 	kind, name, typed := strings.Cut(arg, "/")
 	if !typed {
-		name, kind = arg, "isvc"
+		return "", "", usage("%q has no resource type; use TYPE/NAME, for example isvc/%s or llmisvc/%s", arg, arg, arg)
 	}
-	if name == "" || strings.Contains(name, "/") {
-		return "", "", usage("%q is not a resource name; use NAME or TYPE/NAME, for example isvc/NAME or llmisvc/NAME", arg)
+	if kind == "" || name == "" || strings.Contains(name, "/") {
+		return "", "", usage("%q is not a resource name; use TYPE/NAME, for example isvc/NAME or llmisvc/NAME", arg)
 	}
 	k := strings.TrimSuffix(strings.ToLower(kind), ".serving.kserve.io")
 	if found, ok := supportedTypes[k]; ok {
@@ -55,5 +56,5 @@ func resourceArg(arg string) (Kind, string, error) {
 	if full, ok := plannedTypes[k]; ok {
 		return "", "", usage("%s is not supported yet; this version handles InferenceServices (isvc/NAME) and LLMInferenceServices (llmisvc/NAME)", full)
 	}
-	return "", "", usage("unknown resource type %q; use NAME, isvc/NAME or llmisvc/NAME", kind)
+	return "", "", usage("unknown resource type %q; use isvc/NAME or llmisvc/NAME", kind)
 }

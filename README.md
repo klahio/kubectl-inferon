@@ -1,33 +1,35 @@
-# kubectl-kserve
+# kubectl-inferon
 
-A kubectl plugin for day-to-day operation of a single [KServe](https://kserve.github.io/website/) **InferenceService** or **LLMInferenceService** (KServe's resource for large language models served with vLLM).
+A kubectl plugin that diagnoses machine learning (ML) model inference services on Kubernetes: why a model is not serving, whether it answers a real request, and what its containers printed.
 
-One InferenceService turns into many Kubernetes objects: a serving runtime, Deployments, pods with a model-download init container, Services, an Ingress or Gateway API HTTPRoutes, and an autoscaler. When a model is not serving, the reason is usually several objects away. KServe's own status often doesn't help: when a pod fails, the reason it reports is "Predictor ingress not created". `kubectl kserve` answers three questions with one command each:
+An inference service turns into many Kubernetes objects: a serving runtime, Deployments, pods that download the model before the server starts, Services, an Ingress or Gateway API HTTPRoutes, and an autoscaler. When a model is not serving, the reason is usually several objects away, and the service's own status often points somewhere else: when a pod runs out of memory, it may report only that the ingress was not created.
+
+General pod diagnosis tools stop at the pod. `kubectl inferon` knows the path a model takes from storage to an answered request: the model download, the serving runtime that must support the model format, the model server's crash log (for vLLM it finds the actual cause, such as GPU out of memory, behind "Engine core initialization failed"), the Ingress or Gateway API route that must really reach the model, and the inference protocol the server speaks. It answers three questions with one command each:
 
 | Question | Command |
 |---|---|
-| Is my model serving, and if not, why? | `kubectl kserve status NAME` |
-| Does it actually answer a request? | `kubectl kserve test NAME -f input.json`, or `--prompt "..."` for an LLM |
-| What did its containers print? | `kubectl kserve logs NAME` |
+| Is my model serving, and if not, why? | `kubectl inferon status TYPE/NAME` |
+| Does it actually answer a request? | `kubectl inferon test TYPE/NAME -f input.json`, or `--prompt "..."` for an LLM |
+| What did its containers print? | `kubectl inferon logs TYPE/NAME` |
 
-Commands take a resource the way kubectl does: `NAME` or `isvc/NAME` is an InferenceService, `llmisvc/NAME` is an LLMInferenceService (both are the short names KServe registers).
+**Currently supported**: [KServe](https://kserve.github.io/website/) **InferenceService** and **LLMInferenceService** (KServe's resource for large language models (LLMs) served with vLLM), in KServe's Standard deployment mode (not Knative serverless). Commands always take the resource as `TYPE/NAME`, the way kubectl does: `isvc/NAME` is an InferenceService, `llmisvc/NAME` is an LLMInferenceService. See [Compatibility](#compatibility) for versions.
 
-This is a community plugin, not part of the KServe project. It is read-only and supports KServe's Standard deployment mode (not Knative serverless).
+The plugin is read-only: it never creates, changes or deletes cluster objects.
 
 ## Install
 
 With [krew](https://krew.sigs.k8s.io/) (once the plugin is in the krew index):
 
 ```bash
-kubectl krew install kserve
+kubectl krew install inferon
 ```
 
-From a release: download the archive for your platform from [Releases](https://github.com/klahio/kubectl-kserve/releases), then put `kubectl-kserve` on your `PATH`.
+From a release: download the archive for your platform from [Releases](https://github.com/klahio/kubectl-inferon/releases), then put `kubectl-inferon` on your `PATH`.
 
 From source (Go 1.26 or newer):
 
 ```bash
-go install github.com/klahio/kubectl-kserve@latest
+go install github.com/klahio/kubectl-inferon@latest
 ```
 
 ## Usage
@@ -35,7 +37,7 @@ go install github.com/klahio/kubectl-kserve@latest
 ### status: summary and diagnosis
 
 ```console
-$ kubectl kserve status sklearn-canary -n kserve-test
+$ kubectl inferon status isvc/sklearn-canary -n kserve-test
 sklearn-canary   namespace: kserve-test   mode: Standard   Ready   age: 14m
 
 Endpoints
@@ -65,7 +67,7 @@ Conditions
 When something is wrong, `status` follows the chain InferenceService → Deployment → pod → container and names the cause:
 
 ```console
-$ kubectl kserve status bad-storage -n kserve-test
+$ kubectl inferon status isvc/bad-storage -n kserve-test
 ...
 Diagnosis
   ✗ Model download failed   predictor pod/bad-storage-predictor-f4cfc7765-wxst8
@@ -97,7 +99,7 @@ What it diagnoses:
 ### test: smoke-test inference request
 
 ```console
-$ kubectl kserve test sklearn-iris -n kserve-test -f examples/iris-input.json
+$ kubectl inferon test isvc/sklearn-iris -n kserve-test -f examples/iris-input.json
 POST https://sklearn-iris-kserve-test.k8s.internal/v1/models/sklearn-iris:predict
   connected to 192.168.4.30:443
   protocol v1 (input has "instances") · via HTTPRoute sklearn-iris at 192.168.4.30:443
@@ -129,10 +131,10 @@ You don't need to know the protocol either. `test` uses the first rule that give
 ### logs: the right containers, without pod names
 
 ```bash
-kubectl kserve logs sklearn-iris                # model server of every predictor pod
-kubectl kserve logs sklearn-iris --init         # model download (storage-initializer)
-kubectl kserve logs sklearn-iris -c all -f      # every component; follows new and restarted pods
-kubectl kserve logs sklearn-iris -p             # the previous, crashed instance
+kubectl inferon logs isvc/sklearn-iris           # model server of every predictor pod
+kubectl inferon logs isvc/sklearn-iris --init    # model download (storage-initializer)
+kubectl inferon logs isvc/sklearn-iris -c all -f # every component; follows new and restarted pods
+kubectl inferon logs isvc/sklearn-iris -p        # the previous, crashed instance
 ```
 
 When more than one container is shown, each line is prefixed with `[component/pod/container]`. `--since`, `--tail` (default 100 lines; `-1` for all) and `--prefix auto|true|false` work as you would expect.
@@ -142,7 +144,7 @@ When more than one container is shown, each line is prefixed with `[component/po
 The same three commands work on `llmisvc/NAME`:
 
 ```console
-$ kubectl kserve test llmisvc/smollm -n kserve-test --prompt "What is Kubernetes? Answer in one sentence."
+$ kubectl inferon test llmisvc/smollm -n kserve-test --prompt "What is Kubernetes? Answer in one sentence."
 POST http://127.0.0.1:44271/v1/chat/completions
   protocol openai (LLMInferenceService) · via port-forward to svc/smollm-kserve-workload-svc
 200 OK · 73 ms
@@ -192,7 +194,7 @@ The plugin reads KServe objects as unstructured data and checks for fields rathe
 
 ## Permissions
 
-`kubectl kserve` never creates, changes or deletes cluster objects. It needs:
+`kubectl inferon` never creates, changes or deletes cluster objects. It needs:
 - `get` and `list` in the namespace on `inferenceservices`, `servingruntimes`, `pods`, `deployments`, `horizontalpodautoscalers`, `services`, `ingresses`, `httproutes` and `events`, and `get` on `pods/log`
 - cluster-wide `get` and `list` on `clusterservingruntimes` and `ingressclasses`, and `get` on the `gateways` an HTTPRoute attaches to (often in another namespace)
 - for LLMInferenceServices also `llminferenceservices` and, for multi-node services, `leaderworkersets`

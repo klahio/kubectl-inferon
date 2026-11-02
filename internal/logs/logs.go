@@ -16,8 +16,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/klahio/kubectl-kserve/internal/isvc"
-	"github.com/klahio/kubectl-kserve/internal/llmisvc"
+	"github.com/klahio/kubectl-inferon/internal/isvc"
+	"github.com/klahio/kubectl-inferon/internal/llmisvc"
 )
 
 // ComponentAll selects the pods of every component together.

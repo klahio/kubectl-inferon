@@ -8,7 +8,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/klahio/kubectl-kserve/internal/inference"
+	"github.com/klahio/kubectl-inferon/internal/inference"
 )
 
 func TestDiscoverErrorExitCodes(t *testing.T) {

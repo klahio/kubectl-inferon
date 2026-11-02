@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/klahio/kubectl-kserve/internal/isvc"
+	"github.com/klahio/kubectl-inferon/internal/isvc"
 )
 
 // Group and resource; the version is chosen at run time (PreferredVersions).

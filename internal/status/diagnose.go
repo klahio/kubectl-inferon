@@ -12,8 +12,8 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/klahio/kubectl-kserve/internal/isvc"
-	"github.com/klahio/kubectl-kserve/internal/version"
+	"github.com/klahio/kubectl-inferon/internal/isvc"
+	"github.com/klahio/kubectl-inferon/internal/version"
 )
 
 // Severity of a finding.
@@ -424,7 +424,7 @@ func notRoutable(s *Snapshot, object, detail string) Finding {
 		Title:    titleNotRoutable,
 		Details:  []string{detail},
 		Object:   object,
-		Hint:     fmt.Sprintf("`%s test %s` falls back to port-forward", version.Command, s.ISVC.Name),
+		Hint:     fmt.Sprintf("`%s test isvc/%s` falls back to port-forward", version.Command, s.ISVC.Name),
 	}
 	if c, ok := s.ISVC.Condition("IngressReady"); ok && c.IsTrue() {
 		f.Details = append(f.Details, "KServe still reports IngressReady=True")

@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/klahio/kubectl-kserve/internal/logs"
+	"github.com/klahio/kubectl-inferon/internal/logs"
 )
 
 type logsOptions struct {
@@ -25,12 +25,12 @@ type logsOptions struct {
 func newLogsCommand(root *rootOptions) *cobra.Command {
 	o := &logsOptions{rootOptions: root}
 	c := &cobra.Command{
-		Use:   "logs [isvc/|llmisvc/]NAME",
+		Use:   "logs (isvc|llmisvc)/NAME",
 		Short: "Show logs of an InferenceService's containers without looking up pod or container names",
-		Example: fmt.Sprintf(`  %[1]s%[2]s logs sklearn-iris                  # model server of every predictor pod
-  %[1]s%[2]s logs sklearn-iris --init           # model download (storage-initializer)
-  %[1]s%[2]s logs sklearn-iris -c all -f        # follow every component
-  %[1]s%[2]s logs sklearn-iris -p               # the previous, crashed instance
+		Example: fmt.Sprintf(`  %[1]s%[2]s logs isvc/sklearn-iris            # model server of every predictor pod
+  %[1]s%[2]s logs isvc/sklearn-iris --init     # model download (storage-initializer)
+  %[1]s%[2]s logs isvc/sklearn-iris -c all -f  # follow every component
+  %[1]s%[2]s logs isvc/sklearn-iris -p         # the previous, crashed instance
   %[1]s%[2]s logs llmisvc/smollm               # vLLM server (container main) of an LLMInferenceService`, commandPrefix(), PluginName),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

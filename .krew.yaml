@@ -1,35 +1,36 @@
 apiVersion: krew.googlecontainertools.github.com/v1alpha2
 kind: Plugin
 metadata:
-  name: kserve
+  name: inferon
 spec:
   version: {{ .TagName }}
-  homepage: https://github.com/klahio/kubectl-kserve
-  shortDescription: Diagnose, test and read logs of KServe models
+  homepage: https://github.com/klahio/kubectl-inferon
+  shortDescription: Diagnose machine learning inference services
   description: |
-    A KServe InferenceService or LLMInferenceService fans out into a serving
-    runtime, Deployments, pods with a model-download init container, Services,
-    an Ingress or Gateway API routes, and an autoscaler. When a model is not serving, the cause is
-    usually several objects away, and KServe's own Ready reason often points
-    somewhere else (for example "Predictor ingress not created" when the pod
-    is out of memory).
+    Diagnoses machine learning model inference services on Kubernetes, where
+    general pod diagnosis tools stop short: it knows the path a model takes
+    from storage to an answered request.
 
-    This plugin follows that chain for you and names the common causes:
-    a failed model download, an image that cannot be pulled, a crash or an
-    out-of-memory kill, a pod that cannot be scheduled, a model format without
-    a runtime, or an external address that cannot be reached. For vLLM
-    servers it searches the crash log for the actual cause, because the last
-    line rarely says it. It also sends a smoke-test request (an OpenAI chat
-    prompt for language models) without you knowing the address or the
-    protocol, falling back to port-forward when the model is not exposed. And
-    it shows the right container logs without pod names.
+    - Model loading: a failed model download in the init container, a model
+      format that no serving runtime supports, a model server that crashes
+      or runs out of memory while loading. For vLLM servers it searches the
+      crash log for the actual cause (driver library not found, GPU out of
+      memory, no GPU visible, a refused Hugging Face download), because the
+      last line is usually just "Engine core initialization failed".
+    - Request path: whether the external address really reaches the model
+      through the Ingress or the Gateway API route, even when the service
+      reports itself ready, and routes left behind after a migration.
+    - A real inference request: the test command finds a working route
+      (falling back to port-forward) and the protocol (v1, the v2 Open
+      Inference Protocol, or OpenAI chat for language models), sends one
+      request and shows the answer.
+    - Logs by role: the model server, the model download, or every
+      component, without pod names.
 
-    Supports KServe v0.16 to v0.21: InferenceServices in Standard mode, with
-    Ingress or Gateway API, including canary rollouts, and LLMInferenceServices.
+    Currently supports KServe v0.16 to v0.21: InferenceService in Standard
+    mode (Ingress or Gateway API, canary rollouts) and LLMInferenceService.
     Read-only: it never changes the cluster.
   caveats: |
-    This is a community plugin, not part of the KServe project. It supports
-    KServe's Standard deployment mode only (not Knative serverless).
     The plugin only reads cluster objects. The test command also needs
     permission to create pods/portforward when it falls back to port-forward.
   platforms:
@@ -37,65 +38,65 @@ spec:
       matchLabels:
         os: linux
         arch: amd64
-    {{addURIAndSha "https://github.com/klahio/kubectl-kserve/releases/download/{{ .TagName }}/kubectl-kserve_{{ .TagName }}_linux_amd64.tar.gz" .TagName }}
+    {{addURIAndSha "https://github.com/klahio/kubectl-inferon/releases/download/{{ .TagName }}/kubectl-inferon_{{ .TagName }}_linux_amd64.tar.gz" .TagName }}
     files:
-    - from: kubectl-kserve
+    - from: kubectl-inferon
       to: .
     - from: LICENSE
       to: .
-    bin: kubectl-kserve
+    bin: kubectl-inferon
   - selector:
       matchLabels:
         os: linux
         arch: arm64
-    {{addURIAndSha "https://github.com/klahio/kubectl-kserve/releases/download/{{ .TagName }}/kubectl-kserve_{{ .TagName }}_linux_arm64.tar.gz" .TagName }}
+    {{addURIAndSha "https://github.com/klahio/kubectl-inferon/releases/download/{{ .TagName }}/kubectl-inferon_{{ .TagName }}_linux_arm64.tar.gz" .TagName }}
     files:
-    - from: kubectl-kserve
+    - from: kubectl-inferon
       to: .
     - from: LICENSE
       to: .
-    bin: kubectl-kserve
+    bin: kubectl-inferon
   - selector:
       matchLabels:
         os: darwin
         arch: amd64
-    {{addURIAndSha "https://github.com/klahio/kubectl-kserve/releases/download/{{ .TagName }}/kubectl-kserve_{{ .TagName }}_darwin_amd64.tar.gz" .TagName }}
+    {{addURIAndSha "https://github.com/klahio/kubectl-inferon/releases/download/{{ .TagName }}/kubectl-inferon_{{ .TagName }}_darwin_amd64.tar.gz" .TagName }}
     files:
-    - from: kubectl-kserve
+    - from: kubectl-inferon
       to: .
     - from: LICENSE
       to: .
-    bin: kubectl-kserve
+    bin: kubectl-inferon
   - selector:
       matchLabels:
         os: darwin
         arch: arm64
-    {{addURIAndSha "https://github.com/klahio/kubectl-kserve/releases/download/{{ .TagName }}/kubectl-kserve_{{ .TagName }}_darwin_arm64.tar.gz" .TagName }}
+    {{addURIAndSha "https://github.com/klahio/kubectl-inferon/releases/download/{{ .TagName }}/kubectl-inferon_{{ .TagName }}_darwin_arm64.tar.gz" .TagName }}
     files:
-    - from: kubectl-kserve
+    - from: kubectl-inferon
       to: .
     - from: LICENSE
       to: .
-    bin: kubectl-kserve
+    bin: kubectl-inferon
   - selector:
       matchLabels:
         os: windows
         arch: amd64
-    {{addURIAndSha "https://github.com/klahio/kubectl-kserve/releases/download/{{ .TagName }}/kubectl-kserve_{{ .TagName }}_windows_amd64.zip" .TagName }}
+    {{addURIAndSha "https://github.com/klahio/kubectl-inferon/releases/download/{{ .TagName }}/kubectl-inferon_{{ .TagName }}_windows_amd64.zip" .TagName }}
     files:
-    - from: kubectl-kserve.exe
+    - from: kubectl-inferon.exe
       to: .
     - from: LICENSE
       to: .
-    bin: kubectl-kserve.exe
+    bin: kubectl-inferon.exe
   - selector:
       matchLabels:
         os: windows
         arch: arm64
-    {{addURIAndSha "https://github.com/klahio/kubectl-kserve/releases/download/{{ .TagName }}/kubectl-kserve_{{ .TagName }}_windows_arm64.zip" .TagName }}
+    {{addURIAndSha "https://github.com/klahio/kubectl-inferon/releases/download/{{ .TagName }}/kubectl-inferon_{{ .TagName }}_windows_arm64.zip" .TagName }}
     files:
-    - from: kubectl-kserve.exe
+    - from: kubectl-inferon.exe
       to: .
     - from: LICENSE
       to: .
-    bin: kubectl-kserve.exe
+    bin: kubectl-inferon.exe

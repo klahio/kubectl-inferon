@@ -7,7 +7,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/klahio/kubectl-kserve/internal/kube"
+	"github.com/klahio/kubectl-inferon/internal/kube"
 )
 
 // clients builds the Kubernetes clients and resolves the namespace from the kubectl-compatible flags.

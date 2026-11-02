@@ -10,7 +10,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/duration"
 
-	"github.com/klahio/kubectl-kserve/internal/isvc"
+	"github.com/klahio/kubectl-inferon/internal/isvc"
 )
 
 // Text colors, used only when the output is a terminal (docs/mvp.md section 3).

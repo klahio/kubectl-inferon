@@ -13,8 +13,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	"github.com/klahio/kubectl-kserve/internal/isvc"
-	"github.com/klahio/kubectl-kserve/internal/llmisvc"
+	"github.com/klahio/kubectl-inferon/internal/isvc"
+	"github.com/klahio/kubectl-inferon/internal/llmisvc"
 )
 
 // Clients are the Kubernetes clients the commands read from.

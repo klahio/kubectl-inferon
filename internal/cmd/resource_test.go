@@ -13,7 +13,6 @@ func TestResourceArg(t *testing.T) {
 		name     string
 		errorHas string
 	}{
-		{arg: "sklearn-iris", kind: KindInferenceService, name: "sklearn-iris"},
 		{arg: "isvc/sklearn-iris", kind: KindInferenceService, name: "sklearn-iris"},
 		{arg: "InferenceService/sklearn-iris", kind: KindInferenceService, name: "sklearn-iris"},
 		{arg: "inferenceservices.serving.kserve.io/sklearn-iris", kind: KindInferenceService, name: "sklearn-iris"},
@@ -22,7 +21,9 @@ func TestResourceArg(t *testing.T) {
 		{arg: "llminferenceservices.serving.kserve.io/smollm", kind: KindLLMInferenceService, name: "smollm"},
 		{arg: "ig/graph", errorHas: "InferenceGraph is not supported yet"},
 		{arg: "deploy/x", errorHas: `unknown resource type "deploy"`},
+		{arg: "sklearn-iris", errorHas: `"sklearn-iris" has no resource type; use TYPE/NAME, for example isvc/sklearn-iris`},
 		{arg: "isvc/", errorHas: "is not a resource name"},
+		{arg: "/sklearn-iris", errorHas: "is not a resource name"},
 		{arg: "llmisvc/a/b", errorHas: "is not a resource name"},
 	}
 	for _, tt := range tests {

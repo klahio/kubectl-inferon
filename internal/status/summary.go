@@ -9,7 +9,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/klahio/kubectl-kserve/internal/isvc"
+	"github.com/klahio/kubectl-inferon/internal/isvc"
 )
 
 // Summary is the structured result of the status command. It is what `-o json|yaml` prints, and the text

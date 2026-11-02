@@ -24,4 +24,4 @@ Diagnosis
   ⚠ External address not routable   ingress/sklearn-iris
       IngressClass "istio" does not exist
       KServe still reports IngressReady=True
-      hint: `kubectl kserve test sklearn-iris` falls back to port-forward
+      hint: `kubectl inferon test isvc/sklearn-iris` falls back to port-forward

@@ -1,4 +1,4 @@
-module github.com/klahio/kubectl-kserve
+module github.com/klahio/kubectl-inferon
 
 go 1.26.0
 

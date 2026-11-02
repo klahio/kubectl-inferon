@@ -2,7 +2,7 @@
 # Local dry run: go run github.com/goreleaser/goreleaser/v2@v2.18.3 release --snapshot --clean
 version: 2
 
-project_name: kubectl-kserve
+project_name: kubectl-inferon
 
 before:
   hooks:
@@ -10,8 +10,8 @@ before:
     - go test ./...
 
 builds:
-  - id: kubectl-kserve
-    binary: kubectl-kserve
+  - id: kubectl-inferon
+    binary: kubectl-inferon
     main: .
     env:
       - CGO_ENABLED=0
@@ -21,13 +21,13 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/klahio/kubectl-kserve/internal/version.Version={{ .Tag }}
-      - -X github.com/klahio/kubectl-kserve/internal/version.Commit={{ .FullCommit }}
-      - -X github.com/klahio/kubectl-kserve/internal/version.Date={{ .CommitDate }}
+      - -X github.com/klahio/kubectl-inferon/internal/version.Version={{ .Tag }}
+      - -X github.com/klahio/kubectl-inferon/internal/version.Commit={{ .FullCommit }}
+      - -X github.com/klahio/kubectl-inferon/internal/version.Date={{ .CommitDate }}
     mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
-  - id: kubectl-kserve
+  - id: kubectl-inferon
     # The name must match the URIs in .krew.yaml.
     name_template: "{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
@@ -53,6 +53,6 @@ changelog:
 release:
   github:
     owner: klahio
-    name: kubectl-kserve
+    name: kubectl-inferon
   draft: false
   prerelease: auto

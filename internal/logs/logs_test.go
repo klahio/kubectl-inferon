@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/klahio/kubectl-kserve/internal/isvc"
+	"github.com/klahio/kubectl-inferon/internal/isvc"
 )
 
 func pod(name, component string, running bool) corev1.Pod {

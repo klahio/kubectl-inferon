@@ -15,8 +15,8 @@ import (
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
-	"github.com/klahio/kubectl-kserve/internal/inference"
-	"github.com/klahio/kubectl-kserve/internal/status"
+	"github.com/klahio/kubectl-inferon/internal/inference"
+	"github.com/klahio/kubectl-inferon/internal/status"
 )
 
 // openAITimeout is the default request timeout for LLMs: the first request to a freshly started vLLM server took
@@ -42,11 +42,11 @@ type testOptions struct {
 func newTestCommand(root *rootOptions) *cobra.Command {
 	o := &testOptions{rootOptions: root}
 	c := &cobra.Command{
-		Use:   "test [isvc/|llmisvc/]NAME (-f INPUT.json | --prompt TEXT)",
+		Use:   "test (isvc|llmisvc)/NAME (-f INPUT.json | --prompt TEXT)",
 		Short: "Send one smoke-test inference request, finding the address and protocol automatically",
-		Example: fmt.Sprintf(`  %[1]s%[2]s test sklearn-iris -f input.json
-  %[1]s%[2]s test sklearn-iris -f input.json -o summary
-  cat input.json | %[1]s%[2]s test sklearn-iris -f - -o raw | jq .predictions
+		Example: fmt.Sprintf(`  %[1]s%[2]s test isvc/sklearn-iris -f input.json
+  %[1]s%[2]s test isvc/sklearn-iris -f input.json -o summary
+  cat input.json | %[1]s%[2]s test isvc/sklearn-iris -f - -o raw | jq .predictions
   %[1]s%[2]s test llmisvc/smollm --prompt "What is Kubernetes?"
   %[1]s%[2]s test llmisvc/smollm -f chat.json -o summary          # OpenAI body with "messages"`, commandPrefix(), PluginName),
 		Args: cobra.ExactArgs(1),
@@ -121,7 +121,7 @@ func (o *testOptions) run(ctx context.Context, name string) error {
 		choice inference.Choice
 		model  = o.model
 		ready  string
-		arg    = name
+		arg    = "isvc/" + name
 	)
 	switch o.kind {
 	case KindLLMInferenceService:

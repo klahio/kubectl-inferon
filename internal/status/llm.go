@@ -13,10 +13,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/klahio/kubectl-kserve/internal/isvc"
-	"github.com/klahio/kubectl-kserve/internal/kube"
-	"github.com/klahio/kubectl-kserve/internal/llmisvc"
-	"github.com/klahio/kubectl-kserve/internal/version"
+	"github.com/klahio/kubectl-inferon/internal/isvc"
+	"github.com/klahio/kubectl-inferon/internal/kube"
+	"github.com/klahio/kubectl-inferon/internal/llmisvc"
+	"github.com/klahio/kubectl-inferon/internal/version"
 )
 
 var leaderWorkerSetGVR = schema.GroupVersionResource{Group: "leaderworkerset.x-k8s.io", Version: "v1", Resource: "leaderworkersets"}

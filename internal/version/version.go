@@ -9,19 +9,19 @@ import (
 
 // Name is the plugin's name: the binary is "kubectl-" + Name and users type "kubectl " + Name. It is the only place
 // the name is spelled out, so a rename stays cheap (docs/mvp.md, decision 5).
-const Name = "kserve"
+const Name = "inferon"
 
 // Command is how users invoke the plugin, for messages that tell them what to run next.
 const Command = "kubectl " + Name
 
-// Set by the linker, for example -X github.com/klahio/kubectl-kserve/internal/version.Version=v0.1.0.
+// Set by the linker, for example -X github.com/klahio/kubectl-inferon/internal/version.Version=v0.1.0.
 var (
 	Version = "dev"
 	Commit  = ""
 	Date    = ""
 )
 
-// String is the one-line version shown by `kubectl kserve version` and `--version`.
+// String is the one-line version shown by `kubectl inferon version` and `--version`.
 func String() string {
 	commit, date := Commit, Date
 	// A `go install` build has no linker flags, but Go records the commit it was built from.

@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/klahio/kubectl-kserve/internal/isvc"
+	"github.com/klahio/kubectl-inferon/internal/isvc"
 )
 
 // Fixtures are captured from real clusters with hack/capture-fixtures.sh, one directory per KServe version and setup.

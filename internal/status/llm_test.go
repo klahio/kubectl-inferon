@@ -20,8 +20,8 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
-	kubepkg "github.com/klahio/kubectl-kserve/internal/kube"
-	"github.com/klahio/kubectl-kserve/internal/llmisvc"
+	kubepkg "github.com/klahio/kubectl-inferon/internal/kube"
+	"github.com/klahio/kubectl-inferon/internal/llmisvc"
 )
 
 // LLMInferenceService fixtures, captured with hack/capture-llm-fixtures.sh from the lab cluster (KServe v0.21).

@@ -1,10 +1,10 @@
-# kubectl-kserve — minimum viable product (version 0.1)
+# kubectl-inferon — minimum viable product (version 0.1)
 
 Status: **draft for review** · Last updated: 2026-10-29 · Supports KServe v0.16 – v0.21 (lab cluster runs v0.21.0) · Resources: InferenceService and LLMInferenceService
 
 ## 1. Purpose
 
-`kubectl-kserve` is a kubectl plugin for day-to-day operation of a single KServe model service: an **InferenceService** (short name `isvc`) or an **LLMInferenceService** (`llmisvc`, KServe's resource for large language models; section 6a).
+`kubectl-inferon` is a kubectl plugin for day-to-day operation of a single KServe model service: an **InferenceService** (short name `isvc`) or an **LLMInferenceService** (`llmisvc`, KServe's resource for large language models; section 6a).
 
 One InferenceService fans out into many Kubernetes objects: a ServingRuntime, Deployments, ReplicaSets, Pods, an init container that downloads the model, a Service, an Ingress or HTTPRoute, and a HorizontalPodAutoscaler. When a model is not serving, finding the reason means checking each of them by hand. When it is serving, calling it means working out the right address, protocol and request body.
 
@@ -12,9 +12,9 @@ Version 0.1 answers three questions with one command each:
 
 | Question | Command |
 |---|---|
-| Is my model serving, and if not, why? | `kubectl kserve status <name>` or `status llmisvc/<name>` |
-| Does it actually answer a request? | `kubectl kserve test <name> -f input.json` or `test llmisvc/<name> --prompt "..."` |
-| What did its containers print? | `kubectl kserve logs <name>` or `logs llmisvc/<name>` |
+| Is my model serving, and if not, why? | `kubectl inferon status <name>` or `status llmisvc/<name>` |
+| Does it actually answer a request? | `kubectl inferon test <name> -f input.json` or `test llmisvc/<name> --prompt "..."` |
+| What did its containers print? | `kubectl inferon logs <name>` or `logs llmisvc/<name>` |
 
 Sections 4 – 6 describe the commands for InferenceServices; section 6a describes what changes for LLMInferenceServices.
 
@@ -26,7 +26,7 @@ Acceptance into the official krew plugin index (`kubernetes-sigs/krew-index`).
 
 There is no existing krew plugin for KServe InferenceService (checked 2026-10-29). The closest neighbor is `inferaudit`, a read-only, cluster-wide audit report of model-serving pods.
 
-> inferaudit = cluster-wide audit report; kubectl-kserve = day-to-day operational commands for a single InferenceService or LLMInferenceService.
+> inferaudit = cluster-wide audit report; kubectl-inferon = day-to-day operational commands for a single InferenceService or LLMInferenceService.
 
 ## 2. Supported environment
 
@@ -116,7 +116,7 @@ Version 0.1 only needs read access, plus `pods/portforward` for `test`.
 
 The plugin never creates, changes or deletes cluster objects.
 
-## 4. `kubectl kserve status <name>`
+## 4. `kubectl inferon status <name>`
 
 A one-screen summary of an InferenceService and, when it is not working, the most likely root cause.
 
@@ -152,7 +152,7 @@ The plugin follows the chain InferenceService → Deployment → ReplicaSet → 
 | Out of memory | Last termination reason `OOMKilled` | The memory limit that was hit |
 | Pod cannot be scheduled | Pod `PodScheduled=False` | The scheduler message (for example "Insufficient nvidia.com/gpu") |
 | No runtime fits the model | `modelStatus.lastFailureInfo.reason` is `NoSupportingRuntime`, or there is no runtime name | The model format that has no supporting runtime |
-| External address not routable (Ingress) | An Ingress exists, but its `ingressClassName` does not match any IngressClass, or it has no load balancer address, **even though `IngressReady=True`** | A warning, and a hint to use `kubectl kserve test` (which falls back to port-forward) |
+| External address not routable (Ingress) | An Ingress exists, but its `ingressClassName` does not match any IngressClass, or it has no load balancer address, **even though `IngressReady=True`** | A warning, and a hint to use `kubectl inferon test` (which falls back to port-forward) |
 | External address not routable (Gateway API) | An HTTPRoute's `status.parents[]` condition `Accepted` or `ResolvedRefs` is not True; or its parent Gateway is missing, not `Programmed`, or has no address | Which route and which Gateway, with the condition's reason and message |
 | Canary not ready | `CanaryPredictorReady=False` (v0.21 and newer) | The canary predictor's name, and the same diagnosis rules applied to its pods |
 | Leftover Ingress | An Ingress owned by the InferenceService whose hosts do not include the external address host. KServe keeps the old Ingress after a switch to Gateway API | A warning with a delete hint. The Ingress does not count against routability, and `test` never uses its address |
@@ -191,7 +191,7 @@ Conditions
   IngressReady     True
   Stopped          False
 
-Hint: the external address is not reachable; `kubectl kserve test sklearn-iris` will use port-forward.
+Hint: the external address is not reachable; `kubectl inferon test isvc/sklearn-iris` will use port-forward.
 ```
 
 ### Acceptance criteria
@@ -204,7 +204,7 @@ Hint: the external address is not reachable; `kubectl kserve test sklearn-iris` 
 - For each deliberately broken sample in section 7, the diagnosis line names the right cause.
 - It finishes in under 2 seconds on the lab cluster for a single InferenceService.
 
-## 5. `kubectl kserve test <name> -f <input.json>`
+## 5. `kubectl inferon test <name> -f <input.json>`
 
 Sends one smoke-test inference request and prints the response. You don't need to know the address or the protocol.
 
@@ -269,13 +269,13 @@ Exit code 0 for a 2xx response, 1 otherwise, in every format.
 
 ### Acceptance criteria
 
-- `kubectl kserve test sklearn-iris -f examples/iris-input.json` returns `{"predictions":[1,1]}` on the lab cluster through port-forward, with no extra flags.
+- `kubectl inferon test isvc/sklearn-iris -f examples/iris-input.json` returns `{"predictions":[1,1]}` on the lab cluster through port-forward, with no extra flags.
 - A v2 input file (`inputs` key) against the same InferenceService uses `/v2/models/sklearn-iris/infer`.
 - A wrong path, or a protocol the runtime doesn't support, gives a clear error before any request is sent.
 - With KServe on Gateway API, it reaches the model over HTTPS through the `lab-gateway` address, without port-forward. Verified 2026-10-29: `HTTP 200 · via HTTPRoute sklearn-iris`.
 - Each `-o` format prints as described, and `-o raw` output can be piped straight into `jq`.
 
-## 6. `kubectl kserve logs <name>`
+## 6. `kubectl inferon logs <name>`
 
 Shows logs from the right pods and containers. You don't need to know pod names, labels or container names.
 
@@ -300,13 +300,13 @@ Shows logs from the right pods and containers. You don't need to know pod names,
 
 ### Acceptance criteria
 
-- `kubectl kserve logs sklearn-iris` prints the sklearn server's startup lines without being told any pod name.
-- `kubectl kserve logs sklearn-iris --init` prints the model download.
+- `kubectl inferon logs isvc/sklearn-iris` prints the sklearn server's startup lines without being told any pod name.
+- `kubectl inferon logs isvc/sklearn-iris --init` prints the model download.
 - `-f` keeps following across a pod restart.
 
 ## 6a. LLMInferenceService (`llmisvc/NAME`)
 
-Added to version 0.1 on 2026-10-29 (decision 6). Implemented the same day; verified on the lab cluster as described in 6a.5. The three commands keep their names and flags; `TYPE/NAME` (decision 5) picks the resource: `kubectl kserve status llmisvc/smollm`.
+Added to version 0.1 on 2026-10-29 (decision 6). Implemented the same day; verified on the lab cluster as described in 6a.5. The three commands keep their names and flags; `TYPE/NAME` (decision 5) picks the resource: `kubectl inferon status llmisvc/smollm`.
 
 ### 6a.1 What KServe creates
 
@@ -444,11 +444,13 @@ Decided 2026-10-29:
 2. **Gateway API**: fully supported next to Kubernetes Ingress in `status` and `test` (sections 2.2, 4, 5), and tested on the lab cluster (section 7).
 3. **`status` exit code**: informational by default; `--exit-code` turns "not Ready" into exit 1 (sections 3, 4).
 4. **`test` output**: the user chooses with `-o pretty|summary|raw|json`; `pretty` is the default (section 5).
-5. **Plugin name**: `kserve` (binary `kubectl-kserve`, repository `klahio/kubectl-kserve`). Renamed from `isvc` on 2026-10-29, before the first release.
-   - **Why**: KServe v0.21 already defines other resources the plugin can grow into: LLMInferenceService, InferenceGraph, TrainedModel and the local model caches. A plugin named after one of them (`isvc`) would no longer fit. `kserve` also follows the krew naming guide: it prefixes the vendor identifier and avoids a resource abbreviation. No krew-index plugin uses the name.
-   - **Trade-off**: the name is broad and may read as "everything about KServe". The `TYPE/NAME` design below makes that growth deliberate.
-   - **`TYPE/NAME` arguments**: like kubectl (`kubectl logs deploy/x`), every command takes `NAME` or `TYPE/NAME`. A bare `NAME`, or `isvc/NAME`, `inferenceservice/NAME` and the plural and API-group spellings, mean an InferenceService. `llmisvc/NAME` (and `llminferenceservice/NAME`) means an LLMInferenceService (decision 6). Other KServe types (`ig`, `tm`, the runtimes) give a usage error saying they are not supported yet, and unknown types give "unknown resource type". Each type has its own handler behind the same commands.
-   - **Keeping a rename cheap**: the name is spelled out in one place in the code, `version.Name`. Messages build "kubectl kserve" from `version.Command`.
+5. **Plugin name**: `inferon` (binary `kubectl-inferon`, repository `klahio/kubectl-inferon`). Named `isvc` until 2026-10-29, then `kserve` until 2026-11-02.
+   - **Why not `kserve`**: the krew-index maintainer closed the `kserve` submission (kubernetes-sigs/krew-index#6555, 2026-10-31): a plugin named after a project must come from that project. Earlier krew-index decisions say the same (`eks-viewer`, `openclaw`, `flink`, `cloudflare-tunnel`), and they also refuse names that are common in the Kubernetes world (`gateway`, `helm`, `trace`). The written naming guide does not say this; only the closed pull requests do.
+   - **Why `inferon`**: a coined word from "inference", so it points at model serving without naming a project or a whole category (`model-serving`, `served-model`). It is not used by a krew plugin or krew-index pull request, and no same-domain project uses it (checked 2026-11-02). Coined names like `datadiff` and `podtrace` were accepted in 2026.
+   - **Trade-off**: a coined word does not explain itself, so the krew description has to say "KServe" early.
+   - **`TYPE/NAME` arguments**: like kubectl (`kubectl logs deploy/x`), every command takes `TYPE/NAME`. `isvc/NAME`, `inferenceservice/NAME` and the plural and API-group spellings mean an InferenceService. `llmisvc/NAME` (and `llminferenceservice/NAME`) means an LLMInferenceService (decision 6). Other KServe types (`ig`, `tm`, the runtimes) give a usage error saying they are not supported yet, and unknown types give "unknown resource type". Each type has its own handler behind the same commands.
+   - **No bare `NAME`** (decided 2026-11-02): a bare `NAME` used to mean an InferenceService. It is now a usage error that suggests `isvc/NAME` or `llmisvc/NAME`, because a default type becomes ambiguous once other serving platforms (for example NVIDIA NIM Operator's NIMService) are supported.
+   - **Keeping a rename cheap**: the name is spelled out in one place in the code, `version.Name`. Messages build "kubectl inferon" from `version.Command`.
 
 6. **LLMInferenceService in version 0.1**: `status`, `test` and `logs` support `llmisvc/NAME` (section 6a). This brings the OpenAI-compatible request mode into 0.1, for LLMInferenceServices and for InferenceServices on the Hugging Face runtime. Router-based setups (Gateway API Inference Extension) are diagnosed from `RouterReady` and their HTTPRoutes and Gateways, but not tested until a router is installed on the lab cluster.
 7. **No `create` command**: creating or editing resources stays with YAML and `kubectl apply`. The plugin stays read-only.
@@ -463,11 +465,11 @@ Decided 2026-10-29:
 | Item | Why it waits | Earliest |
 |---|---|---|
 | Knative (Serverless) mode | Different objects (Knative Services and Revisions) and different status fields; the biggest scope risk | 0.2 |
-| `kubectl kserve list` | `kubectl get isvc` is good enough for 0.1 | 0.2 |
+| `kubectl inferon list` | `kubectl get isvc` is good enough for 0.1 | 0.2 |
 | ServingRuntime listing | Runtime information already appears in `status` | 0.2 |
 | Streaming responses (`"stream": true`) | Server-sent events need a different output path | 0.2 |
 | Disaggregated prefill and decode, and multi-node workloads, on the lab cluster | One GPU, one node; covered by fixtures only | When hardware allows |
-| InferenceGraph (`ig/NAME`) | Its API is still `v1alpha1`, and it is rarely used | Later. First as a "used by graph X" line in `status`, then `kubectl kserve status ig/NAME` |
+| InferenceGraph (`ig/NAME`) | Its API is still `v1alpha1`, and it is rarely used | Later. First as a "used by graph X" line in `status`, then `kubectl inferon status ig/NAME` |
 | TrainedModel (`tm/NAME`, multi-model serving) | Rarely used | Later |
 | Creating or editing InferenceServices or LLMInferenceServices | YAML plus `kubectl apply` already does this well; the plugin stays read-only (decision 7) | Not planned |
 | Saving non-JSON responses (for example generated images) to a file | Needs custom predictors with their own response formats | Later |
@@ -478,7 +480,7 @@ Decided 2026-10-29:
 - **No KServe Go types.** Read InferenceService and ServingRuntime objects through the dynamic client as unstructured data. KServe's Go module pulls in a very large dependency tree and ties the plugin to one KServe version. This also makes it possible to support several KServe versions (section 2.1).
 - **Version handling in one place.** A small internal package turns an unstructured InferenceService into one plugin-side model: mode, runtime, components, canaries and exposure. All the "field exists or not" fallbacks live there, so commands never branch on KServe versions themselves.
 - **Gateway API objects** (HTTPRoute, Gateway) are read through the dynamic client too. If the Gateway API CustomResourceDefinitions are not installed in the cluster, that part is silently skipped.
-- **Go module path**: `github.com/klahio/kubectl-kserve`
+- **Go module path**: `github.com/klahio/kubectl-inferon`
 - **License**: Apache License 2.0 (`LICENSE`, included in every release archive and extracted by krew)
 - **Release**:
   - GoReleaser and GitHub Actions build per-platform archives: Linux, macOS and Windows on amd64 and arm64, with sha256 checksums and fixed version tags.

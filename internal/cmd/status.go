@@ -16,8 +16,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"sigs.k8s.io/yaml"
 
-	"github.com/klahio/kubectl-kserve/internal/kube"
-	"github.com/klahio/kubectl-kserve/internal/status"
+	"github.com/klahio/kubectl-inferon/internal/kube"
+	"github.com/klahio/kubectl-inferon/internal/status"
 )
 
 const (
@@ -38,12 +38,12 @@ type statusOptions struct {
 func newStatusCommand(root *rootOptions) *cobra.Command {
 	o := &statusOptions{rootOptions: root}
 	c := &cobra.Command{
-		Use:   "status [isvc/|llmisvc/]NAME",
+		Use:   "status (isvc|llmisvc)/NAME",
 		Short: "Show a one-screen summary of an InferenceService or LLMInferenceService and diagnose why it is not working",
-		Example: fmt.Sprintf(`  %[1]s%[2]s status sklearn-iris -n kserve-test
+		Example: fmt.Sprintf(`  %[1]s%[2]s status isvc/sklearn-iris -n kserve-test
   %[1]s%[2]s status llmisvc/smollm -n kserve-test
-  %[1]s%[2]s status sklearn-iris -o json
-  %[1]s%[2]s status sklearn-iris --exit-code   # exit 1 when not Ready`, commandPrefix(), PluginName),
+  %[1]s%[2]s status isvc/sklearn-iris -o json
+  %[1]s%[2]s status isvc/sklearn-iris --exit-code   # exit 1 when not Ready`, commandPrefix(), PluginName),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			kind, name, err := resourceArg(args[0])

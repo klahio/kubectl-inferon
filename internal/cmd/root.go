@@ -13,7 +13,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 
-	"github.com/klahio/kubectl-kserve/internal/version"
+	"github.com/klahio/kubectl-inferon/internal/version"
 )
 
 // PluginName is the plugin's name; see version.Name.
@@ -79,12 +79,12 @@ func newRootCommand(streams genericiooptions.IOStreams) *cobra.Command {
 
 	root := &cobra.Command{
 		Use: PluginName,
-		// cobra takes the command name from the first word of Use; the display name makes help read "kubectl kserve".
+		// cobra takes the command name from the first word of Use; the display name makes help read "kubectl inferon".
 		Annotations: map[string]string{cobra.CommandDisplayNameAnnotation: commandPrefix() + PluginName},
-		Short:       "Operate a single KServe InferenceService or LLMInferenceService",
+		Short:       "Diagnose a machine learning model inference service",
 		Version:     version.String(),
-		Long: "Day-to-day operational commands for a single KServe InferenceService or LLMInferenceService: status, test and logs.\n" +
-			"Name the resource as NAME or isvc/NAME (InferenceService), or llmisvc/NAME (LLMInferenceService).",
+		Long: "Diagnose, test and read the logs of a single machine learning model inference service: status, test and logs.\n" +
+			"Name the resource as TYPE/NAME. Currently supported: KServe isvc/NAME (InferenceService) and llmisvc/NAME (LLMInferenceService).",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -107,7 +107,7 @@ func newRootCommand(streams genericiooptions.IOStreams) *cobra.Command {
 	return root
 }
 
-// commandPrefix makes help text read "kubectl kserve ..." when the binary runs as a kubectl plugin.
+// commandPrefix makes help text read "kubectl inferon ..." when the binary runs as a kubectl plugin.
 func commandPrefix() string {
 	if strings.HasPrefix(filepath.Base(os.Args[0]), "kubectl-") {
 		return "kubectl "

@@ -22,10 +22,10 @@ import (
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 
-	"github.com/klahio/kubectl-kserve/internal/isvc"
-	"github.com/klahio/kubectl-kserve/internal/kube"
-	"github.com/klahio/kubectl-kserve/internal/status"
-	"github.com/klahio/kubectl-kserve/internal/version"
+	"github.com/klahio/kubectl-inferon/internal/isvc"
+	"github.com/klahio/kubectl-inferon/internal/kube"
+	"github.com/klahio/kubectl-inferon/internal/status"
+	"github.com/klahio/kubectl-inferon/internal/version"
 )
 
 // Port-forward modes of --port-forward.
@@ -256,7 +256,7 @@ func portForwardISVC(ctx context.Context, c kube.Clients, snap *status.Snapshot,
 	if svc == nil {
 		return nil, fmt.Errorf("no Service found for the %s of %s/%s", component, m.Namespace, m.Name)
 	}
-	return portForwardService(ctx, c, svc, m.Name)
+	return portForwardService(ctx, c, svc, "isvc/"+m.Name)
 }
 
 // portForwardService forwards a free local port to a ready pod behind a Service, as `kubectl port-forward svc/...`.
