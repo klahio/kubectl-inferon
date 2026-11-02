@@ -112,7 +112,7 @@ Version 0.1 only needs read access, plus `pods/portforward` for `test`.
 - Cluster-wide: `get` and `list` on `clusterservingruntimes` and `ingressclasses`; `get` on `gateways` in the Gateway's namespace
 - For LLMInferenceServices also: `llminferenceservices` and `leaderworkersets` (multi-node only), and API discovery of the `serving.kserve.io` group
 - Missing permission for an optional object (for example `gateways`) downgrades that part of the output to "unknown (no permission)" instead of failing the command.
-- `create` on `pods/portforward`
+- `get` and `create` on `pods/portforward` (`get` for the WebSocket transport, `create` for the older SPDY one)
 
 The plugin never creates, changes or deletes cluster objects.
 

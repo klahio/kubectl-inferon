@@ -198,7 +198,7 @@ The plugin reads KServe objects as unstructured data and checks for fields rathe
 - `get` and `list` in the namespace on `inferenceservices`, `servingruntimes`, `pods`, `deployments`, `horizontalpodautoscalers`, `services`, `ingresses`, `httproutes` and `events`, and `get` on `pods/log`
 - cluster-wide `get` and `list` on `clusterservingruntimes` and `ingressclasses`, and `get` on the `gateways` an HTTPRoute attaches to (often in another namespace)
 - for LLMInferenceServices also `llminferenceservices` and, for multi-node services, `leaderworkersets`
-- `create` on `pods/portforward`, for `test`
+- `get` and `create` on `pods/portforward`, for `test` (newer API servers open port-forwards over WebSockets, which needs `get`)
 
 A missing permission on an optional object shows up as "not checked" instead of failing the command.
 

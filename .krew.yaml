@@ -31,8 +31,9 @@ spec:
     mode (Ingress or Gateway API, canary rollouts) and LLMInferenceService.
     Read-only: it never changes the cluster.
   caveats: |
-    The plugin only reads cluster objects. The test command also needs
-    permission to create pods/portforward when it falls back to port-forward.
+    The plugin only reads cluster objects. The test command also needs get
+    and create permission on pods/portforward when it falls back to
+    port-forward.
   platforms:
   - selector:
       matchLabels:
