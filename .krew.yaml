@@ -5,11 +5,11 @@ metadata:
 spec:
   version: {{ .TagName }}
   homepage: https://github.com/klahio/kubectl-inferon
-  shortDescription: Diagnose machine learning inference services
+  shortDescription: Find why a model inference service is not serving
   description: |
-    Diagnoses InferenceServices and LLMInferenceServices on Kubernetes:
-    the model download, the serving runtime, the model server's crash log,
-    the Ingress or Gateway API route, and one inference request.
+    Shows why a machine learning model inference service on Kubernetes is
+    not serving: the model download, the serving runtime, the model server's
+    crash log, the Ingress or Gateway API route, and one inference request.
 
     - list shows each service as TYPE/NAME with its readiness and the first
       problem found in its pods. The other commands take that TYPE/NAME.
